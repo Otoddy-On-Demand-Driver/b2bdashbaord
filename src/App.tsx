@@ -5,7 +5,8 @@ import { authStore } from "./store/authStore";
 import Protected from "./components/ui/Protected";
 import RoleGate from "./components/ui/RoleGate";
 import CreateBooking from "./pages/CreateBooking";
-
+import InvoicesPage from "./pages/invoices/InvoicesPage";
+import InvoiceView from "./pages/invoices/InvoiceView";
 import LoginPage from "./pages/auth/LoginPage";
 import AppShell from "./layouts/AppShell";
 import DashboardHome from "./pages/app/DashboardHome";
@@ -36,7 +37,8 @@ export default function App() {
         <Route path="/forbidden" element={<Forbidden />} />
 <Route path="rides/create" element={<CreateBooking />} />
 <Route path="/b2b/rides" element={<B2BRidesPage />} />
-
+<Route path="/invoices" element={<InvoicesPage />} />
+        <Route path="/invoices/:invoiceId" element={<InvoiceView />} />
         {/* Protected */}
         <Route element={<Protected />}>
           {/* Role: all logged-in users */}
