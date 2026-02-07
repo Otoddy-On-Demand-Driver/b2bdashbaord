@@ -204,7 +204,20 @@ export async function opsUpdateEmergency(
   return data as { ok: boolean; ride: Ride; message?: string };
 }
 
+export async function opsApproveDriverVerification(driverId: string) {
+  const r = await api.post(`/ops/drivers/${driverId}/approve`);
+  return r.data;
+}
 
+export async function opsGetAllDrivers() {
+  const r = await api.get("/ops/drivers");
+  return r.data;
+}
+
+export async function opsGetPendingDrivers() {
+  const r = await api.get("/ops/drivers/pending-verification");
+  return r.data;
+}
 // ---------------- PAYMENTS / WITHDRAWALS ----------------
 
 export type Withdrawal = {

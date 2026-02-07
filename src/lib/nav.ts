@@ -20,7 +20,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Overview", to: "/", icon: LayoutDashboard, roles: ["admin","opsteam","b2bclient"] },
-  { key: "rides", label: "Rides", to: "/rides", icon: CarTaxiFront, roles: ["admin","opsteam","b2bclient"] },
+  { key: "rides", label: "Rides", to: "/rides", icon: CarTaxiFront, roles: ["admin","opsteam"] },
 
   // ✅ NEW: Create Booking
   { key: "createRide", label: "Create Booking", to: "/rides/create", icon: ClipboardPlus, roles: ["b2bclient","admin","opsteam"] },

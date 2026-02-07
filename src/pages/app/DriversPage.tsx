@@ -1,17 +1,16 @@
+// src/pages/app/DriversPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { opsListDrivers, opsSearchDrivers, type Driver } from "../../lib/opsApi";
+import type { Driver } from "../../lib/opsApi";
+import {
+  opsGetAllDrivers,
+  opsGetPendingDrivers,
+  opsApproveDriverVerification,
+  opsRejectDriverVerification,
+  opsSearchDrivers, // keep if you already have it
+} from "../../lib/opsApi";
 import { apiErrorMessage } from "../../lib/api";
 import DriverDrawer from "./drivers/DriverDrawer";
 import { socket } from "../../lib/socket";
-
-/**
- * UI/UX goal:
- * - When a driver registers → shows up in "Verification Queue" (Pending)
- * - OPS/Admin approves from here
- * - Only approved drivers should be allowed to login (backend enforcement later)
- *
- * This page focuses on UI/UX + client-side status updates.
- */
 
 type TabKey = "verification" | "all";
 
@@ -40,25 +39,6 @@ function Chip({
   );
 }
 
-/**
- * UI-only: replace these with your real API calls later.
- * Suggested backend routes:
- * - POST /ops/drivers/:id/approve
- * - POST /ops/drivers/:id/reject  (or /disable)
- */
-async function uiApproveDriver(driverId: string) {
-  // Placeholder: implement later in opsApi
-  // return opsApproveDriver(driverId)
-  await new Promise((r) => setTimeout(r, 300));
-  return { ok: true };
-}
-async function uiRejectDriver(driverId: string) {
-  // Placeholder: implement later in opsApi
-  // return opsRejectDriver(driverId)
-  await new Promise((r) => setTimeout(r, 300));
-  return { ok: true };
-}
-
 export default function DriversPage() {
   const [rows, setRows] = useState<Driver[]>([]);
   const [q, setQ] = useState("");
@@ -67,20 +47,28 @@ export default function DriversPage() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Verification UX states
   const [tab, setTab] = useState<TabKey>("verification");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
     | null
-    | { type: "approve" | "reject"; driverId: string; name: string; phone?: string }
+    | { type: "approve" | "reject"; driverId: string; name: string; phone?: string; reason?: string }
   >(null);
 
-  async function load() {
+  async function load(tabOverride?: TabKey) {
+    const t = tabOverride || tab;
+
     setErr("");
     setLoading(true);
     try {
-      const r = await opsListDrivers();
-      setRows(r.drivers || []);
+      if (t === "verification") {
+        const r = await opsGetPendingDrivers();
+        // backend: { ok:true, verificationPendingDrivers:[...] }
+        setRows((r as any).verificationPendingDrivers || []);
+      } else {
+        const r = await opsGetAllDrivers();
+        // backend: { ok:true, drivers:[...] }
+        setRows((r as any).drivers || []);
+      }
     } catch (e: any) {
       setErr(apiErrorMessage(e, "Failed to load drivers"));
     } finally {
@@ -88,37 +76,22 @@ export default function DriversPage() {
     }
   }
 
+  // load when tab changes
   useEffect(() => {
-    load();
-  }, []);
+    load(tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
-  async function search() {
-    const s = q.trim();
-    if (!s) return load();
-    setErr("");
-    setLoading(true);
-    try {
-      const r = await opsSearchDrivers(s);
-      setRows(r.drivers || []);
-      // When searching, default to "All" so the user can find anyone
-      setTab("all");
-    } catch (e: any) {
-      setErr(apiErrorMessage(e, "Search failed"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Live status updates (online/offline)
+  // live status updates (online/offline)
   useEffect(() => {
-    function onStatusChanged({
-      driverId,
-      status,
-    }: {
-      driverId: string;
-      status: "online" | "offline";
-    }) {
-      setRows((prev) => prev.map((d) => (d._id === driverId ? { ...d, currentStatus: status } : d)));
+    function onStatusChanged(payload: any) {
+      const driverId = String(payload?.driverId || payload?._id || "");
+      const status = payload?.status || payload?.currentStatus;
+      if (!driverId) return;
+
+      setRows((prev) =>
+        prev.map((d) => (String((d as any)._id) === driverId ? ({ ...d, currentStatus: status } as any) : d))
+      );
     }
 
     socket.on("driverStatusChanged", onStatusChanged);
@@ -127,25 +100,52 @@ export default function DriversPage() {
     };
   }, []);
 
-  const pendingVerification = useMemo(
-    () => rows.filter((d) => !d.isApproved),
-    [rows]
-  );
+  // Optional: when backend emits "driverApproved"/"driverRejected", refresh list
+  useEffect(() => {
+    function refreshIfAny() {
+      load(tab);
+    }
+    socket.on("driverApproved", refreshIfAny);
+    socket.on("driverRejected", refreshIfAny);
+    return () => {
+      socket.off("driverApproved", refreshIfAny);
+      socket.off("driverRejected", refreshIfAny);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
-  const approvedDrivers = useMemo(
-    () => rows.filter((d) => !!d.isApproved),
-    [rows]
-  );
+  async function search() {
+    const s = q.trim();
+    if (!s) return load(tab);
+
+    setErr("");
+    setLoading(true);
+    try {
+      // If your backend search endpoint returns {ok:true, drivers:[...]}
+      const r = await opsSearchDrivers(s);
+      setRows((r as any).drivers || []);
+      setTab("all"); // searching should show from "all"
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Search failed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const pendingVerification = useMemo(() => rows.filter((d: any) => !d.isApproved), [rows]);
+
+  const approvedDrivers = useMemo(() => rows.filter((d: any) => !!d.isApproved), [rows]);
 
   const list = useMemo(() => {
+    // If tab is verification, backend already returned pending list; but safe fallback:
     return tab === "verification" ? pendingVerification : rows;
   }, [rows, pendingVerification, tab]);
 
-  function openApprove(d: Driver) {
-    setConfirm({ type: "approve", driverId: d._id, name: d.name, phone: (d as any).phoneNumber });
+  function openApprove(d: any) {
+    setConfirm({ type: "approve", driverId: String(d._id), name: d.name, phone: d.phoneNumber });
   }
-  function openReject(d: Driver) {
-    setConfirm({ type: "reject", driverId: d._id, name: d.name, phone: (d as any).phoneNumber });
+  function openReject(d: any) {
+    setConfirm({ type: "reject", driverId: String(d._id), name: d.name, phone: d.phoneNumber });
   }
 
   async function runConfirmAction() {
@@ -155,24 +155,18 @@ export default function DriversPage() {
     setErr("");
     setActionBusyId(driverId);
 
-    // Optimistic UI
-    setRows((prev) =>
-      prev.map((d) =>
-        d._id !== driverId
-          ? d
-          : type === "approve"
-          ? { ...d, isApproved: true, isVerified: true }
-          : { ...d, isApproved: false } // rejected stays unapproved (you can add isRejected flag later)
-      )
-    );
-
     try {
-      if (type === "approve") await uiApproveDriver(driverId);
-      else await uiRejectDriver(driverId);
+      if (type === "approve") {
+        await opsApproveDriverVerification(driverId);
+      } else {
+        await opsRejectDriverVerification(driverId, confirm.reason);
+      }
+
+      // ✅ IMPORTANT: refresh from DB so it persists after page revisit
+      await load(tab);
     } catch (e: any) {
-      // Rollback on failure
-      await load();
       setErr(apiErrorMessage(e, type === "approve" ? "Approve failed" : "Reject failed"));
+      await load(tab);
     } finally {
       setActionBusyId(null);
       setConfirm(null);
@@ -189,7 +183,6 @@ export default function DriversPage() {
             Verification queue and driver management. Approve new registrations before they can use the app.
           </p>
 
-          {/* Flow hint */}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
             <Chip tone="blue">Step 1: Driver registers</Chip>
             <span className="text-slate-400">→</span>
@@ -200,14 +193,14 @@ export default function DriversPage() {
         </div>
 
         <button
-          onClick={load}
+          onClick={() => load(tab)}
           className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
         >
           Refresh
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs + Search */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setTab("verification")}
@@ -218,9 +211,11 @@ export default function DriversPage() {
           }`}
         >
           Verification Queue
-          <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
-            tab === "verification" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
-          }`}>
+          <span
+            className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
+              tab === "verification" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
             {pendingVerification.length}
           </span>
         </button>
@@ -234,9 +229,11 @@ export default function DriversPage() {
           }`}
         >
           All Drivers
-          <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
-            tab === "all" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
-          }`}>
+          <span
+            className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
+              tab === "all" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
             {rows.length}
           </span>
         </button>
@@ -272,7 +269,7 @@ export default function DriversPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
           <div className="text-xs font-semibold text-slate-500">Online Right Now</div>
           <div className="mt-1 text-2xl font-extrabold text-slate-900">
-            {rows.filter((d) => d.currentStatus === "online").length}
+            {rows.filter((d: any) => d.currentStatus === "online").length}
           </div>
           <div className="mt-1 text-xs text-slate-600">Live status from socket events.</div>
         </div>
@@ -291,9 +288,7 @@ export default function DriversPage() {
           <div className="col-span-2">Online</div>
           <div className="col-span-2">Verified</div>
           <div className="col-span-2">Approval</div>
-          <div className="col-span-2 text-right">
-            {tab === "verification" ? "Verification" : "Action"}
-          </div>
+          <div className="col-span-2 text-right">{tab === "verification" ? "Verification" : "Action"}</div>
         </div>
 
         {loading ? (
@@ -303,16 +298,16 @@ export default function DriversPage() {
             {tab === "verification" ? "No pending drivers." : "No drivers."}
           </div>
         ) : (
-          list.map((d) => {
+          list.map((d: any) => {
             const onlineTone = d.currentStatus === "online" ? "green" : "slate";
             const verifiedTone = d.isVerified ? "green" : "amber";
             const approvalTone = d.isApproved ? "green" : "amber";
 
-            const busy = actionBusyId === d._id;
+            const busy = actionBusyId === String(d._id);
 
             return (
               <div
-                key={d._id}
+                key={String(d._id)}
                 className="grid grid-cols-12 gap-3 px-5 py-4 border-b border-slate-100 hover:bg-slate-50"
               >
                 <div className="col-span-4">
@@ -320,7 +315,7 @@ export default function DriversPage() {
                     <div className="text-sm font-semibold text-slate-900">{d.name}</div>
                     {!d.isApproved ? <Chip tone="amber">Pending</Chip> : <Chip tone="green">Approved</Chip>}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{(d as any).phoneNumber}</div>
+                  <div className="mt-1 text-xs text-slate-500">{d.phoneNumber}</div>
                 </div>
 
                 <div className="col-span-2 text-sm text-slate-700">
@@ -336,7 +331,6 @@ export default function DriversPage() {
                 </div>
 
                 <div className="col-span-2 flex justify-end gap-2">
-                  {/* Verification actions only for pending */}
                   {!d.isApproved ? (
                     <>
                       <button
@@ -356,7 +350,7 @@ export default function DriversPage() {
                     </>
                   ) : (
                     <button
-                      onClick={() => setActiveId(d._id)}
+                      onClick={() => setActiveId(String(d._id))}
                       className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     >
                       View
@@ -370,12 +364,7 @@ export default function DriversPage() {
       </div>
 
       {/* Drawer */}
-      <DriverDrawer
-        open={!!activeId}
-        driverId={activeId}
-        onClose={() => setActiveId(null)}
-        onMutated={load}
-      />
+      <DriverDrawer open={!!activeId} driverId={activeId} onClose={() => setActiveId(null)} onMutated={() => load(tab)} />
 
       {/* Confirm Modal */}
       {confirm ? (
@@ -394,13 +383,21 @@ export default function DriversPage() {
             <div className="p-5">
               {confirm.type === "approve" ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  After approval, this driver will be marked <b>Approved</b> and should be allowed to login in the driver app.
-                  (Backend enforcement will be added later.)
+                  After approval, this driver will be marked <b>Approved</b> in DB.
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  Rejected drivers remain <b>Unapproved</b> and should not be allowed to login.
-                </div>
+                <>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    Rejected driver will be <b>deleted</b> (as per backend controller).
+                  </div>
+                  <textarea
+                    value={confirm.reason || ""}
+                    onChange={(e) => setConfirm((p) => (p ? { ...p, reason: e.target.value } : p))}
+                    placeholder="Reason (optional)"
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
+                    rows={3}
+                  />
+                </>
               )}
 
               <div className="mt-4 flex justify-end gap-2">

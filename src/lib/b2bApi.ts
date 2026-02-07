@@ -1,4 +1,5 @@
 import axios from "axios";
+import { api } from "./api";
 
 export const b2bApi = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
@@ -98,7 +99,22 @@ export async function b2bCarHandover(rideId: string) {
   return data as { ok: boolean; ride: Ride };
 }
 
+
+let _cache: Array<{ driverId: string; lat: number | null; lng: number | null }> = [];
+let _cacheAt = 0;
+
 export async function b2bFetchDriverLocation(driverId: string) {
-  const { data } = await b2bApi.get(`/b2bclient/driver-location/${driverId}`);
-  return data as { ok: boolean; driverId: string; lat: number | null; lng: number | null };
+  const now = Date.now();
+
+  // refresh cache every 3 seconds
+  if (now - _cacheAt > 3000) {
+    const res = await api.get("/ops/drivers/coordinates");
+    _cache = res.data?.coordinates || [];
+    _cacheAt = now;
+  }
+
+  const row = _cache.find((x) => String(x.driverId) === String(driverId));
+  return { lat: row?.lat ?? null, lng: row?.lng ?? null };
 }
+
+
