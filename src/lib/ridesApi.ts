@@ -19,6 +19,21 @@ export type CreateRidePayload = {
     car_model: string;
     isInsurance: boolean; // MUST be boolean
   };
+
+  // ✅ Added controller fields
+  businessFunction?: string | null;
+  tripCategory?: string | null;
+  businessCategory?: string | null;
+
+  pickupPOC?: {
+    name?: string | null;
+    phone?: string | null;
+  };
+
+  dropPOC?: {
+    name?: string | null;
+    phone?: string | null;
+  };
 };
 
 export async function createRide(payload: CreateRidePayload) {

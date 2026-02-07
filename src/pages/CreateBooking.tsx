@@ -1,10 +1,50 @@
 import { useMemo, useState } from "react";
 import { createRide, type CreateRidePayload } from "../lib/ridesApi";
 
+/** Frontend mirror of backend enums (must match EXACT strings) */
+const BUSINESS_FUNCTION_VALUES = [
+  "Demand",
+  "Supply",
+  "Pre Sales",
+  "Post Sales",
+  "Servicing",
+  "Refurb",
+] as const;
+
+const TRIP_CATEGORY_VALUES = [
+  "Customer to Hub",
+  "Customer to Partner Workshop",
+  "Customer to Spinny Workshop",
+  "Hub to Customer",
+  "Hub to Spinny Workshop",
+  "Spinny Workshop to Hub",
+  "Hub to Hub",
+  "Hub to Partner Workshop",
+  "Partner Workshop to Hub",
+  "Hub to OEM",
+  "OEM to Hub",
+  "Partner Workshop to Spinny Workshop",
+  "Spinny Workshop to Partner Workshop",
+  "Partner Workshop to Customer",
+  "OEM to Workshop",
+  "OEM to Partner Workshop",
+  "OEM to Spinny Workshop",
+  "OEM to Customer",
+  "Customer to OEM",
+] as const;
+
+const BUSINESS_CATEGORY_VALUES = ["Assured", "Budget", "MAX", "Auction"] as const;
+
+type BusinessFunction = (typeof BUSINESS_FUNCTION_VALUES)[number];
+type TripCategory = (typeof TRIP_CATEGORY_VALUES)[number];
+type BusinessCategory = (typeof BUSINESS_CATEGORY_VALUES)[number];
+
 function num(v: string) {
   const n = Number(v);
   return Number.isFinite(n) ? n : NaN;
 }
+
+type PocForm = { name: string; phone: string };
 
 export default function CreateBooking() {
   const [loading, setLoading] = useState(false);
@@ -20,6 +60,14 @@ export default function CreateBooking() {
     drop_longitude: "",
     RideDescription: "",
     scheduled_time: "",
+
+    // dropdowns (empty string = not selected)
+    businessFunction: "" as "" | BusinessFunction,
+    tripCategory: "" as "" | TripCategory,
+    businessCategory: "" as "" | BusinessCategory,
+
+    pickupPOC: { name: "", phone: "" } as PocForm,
+    dropPOC: { name: "", phone: "" } as PocForm,
 
     car_no: "",
     car_type: "",
@@ -55,21 +103,40 @@ export default function CreateBooking() {
         drop_location: form.drop_location.trim(),
         drop_latitude: num(form.drop_latitude),
         drop_longitude: num(form.drop_longitude),
+
         RideDescription: form.RideDescription?.trim() ? form.RideDescription.trim() : undefined,
         scheduled_time: form.scheduled_time ? new Date(form.scheduled_time).toISOString() : null,
+
         car_details: {
           car_no: form.car_no.trim(),
           car_type: form.car_type.trim(),
           car_model: form.car_model.trim(),
           isInsurance: Boolean(form.isInsurance),
         },
+
+        businessFunction: form.businessFunction || null,
+        tripCategory: form.tripCategory || null,
+        businessCategory: form.businessCategory || null,
+
+        pickupPOC:
+          form.pickupPOC.name.trim() || form.pickupPOC.phone.trim()
+            ? {
+                name: form.pickupPOC.name.trim() || null,
+                phone: form.pickupPOC.phone.trim() || null,
+              }
+            : undefined,
+
+        dropPOC:
+          form.dropPOC.name.trim() || form.dropPOC.phone.trim()
+            ? {
+                name: form.dropPOC.name.trim() || null,
+                phone: form.dropPOC.phone.trim() || null,
+              }
+            : undefined,
       };
 
       const data = await createRide(payload);
       setSuccess(data);
-
-      // optional: reset form
-      // setForm((p) => ({ ...p, RideDescription: "", scheduled_time: "" }));
     } catch (e: any) {
       setErr(e?.message || "Something went wrong");
     } finally {
@@ -80,18 +147,19 @@ export default function CreateBooking() {
   const inputCls =
     "w-full h-11 px-4 rounded-xl border border-black/10 bg-white outline-none focus:ring-2 focus:ring-black/10";
   const labelCls = "text-sm font-semibold text-black/70";
+  const textareaCls =
+    "w-full min-h-[90px] p-4 rounded-xl border border-black/10 bg-white outline-none focus:ring-2 focus:ring-black/10 mt-2";
+  const selectCls = inputCls + " mt-2";
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] p-4 md:p-8">
       <div className="mx-auto max-w-3xl">
         <div className="rounded-3xl bg-white shadow-sm border border-black/5 p-5 md:p-8">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Create Booking</h1>
-              <p className="mt-1 text-sm text-black/60">
-                Pickup/Drop + Car details भरें, fare/time estimation server calculate करेगा.
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Create Booking</h1>
+            <p className="mt-1 text-sm text-black/60">
+              Pickup/Drop + Car details mandatory. बाकी dropdowns optional (backend enums exact match).
+            </p>
           </div>
 
           {err && (
@@ -107,9 +175,7 @@ export default function CreateBooking() {
                 Distance: <b>{success.estimations?.distanceKm}</b> km, Duration:{" "}
                 <b>{success.estimations?.durationMin}</b> min
               </div>
-              <div className="mt-2 text-xs text-green-900/70 break-all">
-                RideId: {success.ride?._id}
-              </div>
+              <div className="mt-2 text-xs text-green-900/70 break-all">RideId: {success.ride?._id}</div>
             </div>
           )}
 
@@ -151,6 +217,36 @@ export default function CreateBooking() {
                   />
                 </div>
               </div>
+
+              {/* Pickup POC */}
+              <div className="mt-5">
+                <div className="text-sm font-bold text-black/80">Pickup POC (optional)</div>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className={labelCls}>Name</div>
+                    <input
+                      className={inputCls + " mt-2"}
+                      value={form.pickupPOC.name}
+                      onChange={(e) =>
+                        setForm({ ...form, pickupPOC: { ...form.pickupPOC, name: e.target.value } })
+                      }
+                      placeholder="POC name"
+                    />
+                  </div>
+                  <div>
+                    <div className={labelCls}>Phone</div>
+                    <input
+                      className={inputCls + " mt-2"}
+                      value={form.pickupPOC.phone}
+                      onChange={(e) =>
+                        setForm({ ...form, pickupPOC: { ...form.pickupPOC, phone: e.target.value } })
+                      }
+                      placeholder="10-digit"
+                      inputMode="tel"
+                    />
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* Drop */}
@@ -188,6 +284,89 @@ export default function CreateBooking() {
                     placeholder="77.0..."
                     inputMode="decimal"
                   />
+                </div>
+              </div>
+
+              {/* Drop POC */}
+              <div className="mt-5">
+                <div className="text-sm font-bold text-black/80">Drop POC (optional)</div>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className={labelCls}>Name</div>
+                    <input
+                      className={inputCls + " mt-2"}
+                      value={form.dropPOC.name}
+                      onChange={(e) => setForm({ ...form, dropPOC: { ...form.dropPOC, name: e.target.value } })}
+                      placeholder="POC name"
+                    />
+                  </div>
+                  <div>
+                    <div className={labelCls}>Phone</div>
+                    <input
+                      className={inputCls + " mt-2"}
+                      value={form.dropPOC.phone}
+                      onChange={(e) => setForm({ ...form, dropPOC: { ...form.dropPOC, phone: e.target.value } })}
+                      placeholder="10-digit"
+                      inputMode="tel"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Meta (Dropdowns) */}
+            <section className="rounded-2xl border border-black/5 p-4 md:p-5">
+              <h2 className="text-lg font-bold">Ride Meta (optional)</h2>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className={labelCls}>Trip Category</div>
+                  <select
+                    className={selectCls}
+                    value={form.tripCategory}
+                    onChange={(e) => setForm({ ...form, tripCategory: e.target.value as any })}
+                  >
+                    <option value="">Select trip category</option>
+                    {TRIP_CATEGORY_VALUES.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-1 text-xs text-black/50">Customer वाले trips पर fare KM-based होगा.</div>
+                </div>
+
+                <div>
+                  <div className={labelCls}>Business Category</div>
+                  <select
+                    className={selectCls}
+                    value={form.businessCategory}
+                    onChange={(e) => setForm({ ...form, businessCategory: e.target.value as any })}
+                  >
+                    <option value="">Select business category</option>
+                    {BUSINESS_CATEGORY_VALUES.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className={labelCls}>Business Function</div>
+                  <select
+                    className={selectCls}
+                    value={form.businessFunction}
+                    onChange={(e) => setForm({ ...form, businessFunction: e.target.value as any })}
+                  >
+                    <option value="">Select business function</option>
+                    {BUSINESS_FUNCTION_VALUES.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-1 text-xs text-black/50">Post Sales / Servicing पर server auto +₹60 adjust करता है.</div>
                 </div>
               </div>
             </section>
@@ -247,7 +426,7 @@ export default function CreateBooking() {
                 <div className="md:col-span-2">
                   <div className={labelCls}>Ride Description</div>
                   <textarea
-                    className={"w-full min-h-[90px] p-4 rounded-xl border border-black/10 bg-white outline-none focus:ring-2 focus:ring-black/10 mt-2"}
+                    className={textareaCls}
                     value={form.RideDescription}
                     onChange={(e) => setForm({ ...form, RideDescription: e.target.value })}
                     placeholder="Any notes..."
@@ -262,9 +441,7 @@ export default function CreateBooking() {
                     value={form.scheduled_time}
                     onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
                   />
-                  <div className="mt-1 text-xs text-black/50">
-                    खाली छोड़ो तो immediate ride create होगी.
-                  </div>
+                  <div className="mt-1 text-xs text-black/50">खाली छोड़ो तो immediate ride create होगी.</div>
                 </div>
               </div>
             </section>

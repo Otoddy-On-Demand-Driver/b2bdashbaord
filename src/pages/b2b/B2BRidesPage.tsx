@@ -4,11 +4,10 @@ import {
   b2bOngoingRides,
   b2bCancelledRides,
   b2bCompletedRides,
-  b2bCarHandover,
   b2bFetchDriverLocation,
   type Ride,
 } from "../../lib/b2bApi";
-import { X, MapPin, Clock, ShieldCheck, AlertTriangle } from "lucide-react";
+import { X, MapPin, Clock, AlertTriangle, User, Car, Briefcase } from "lucide-react";
 
 type TabKey = "requested" | "ongoing" | "cancelled" | "completed";
 
@@ -34,10 +33,8 @@ function money(v: any) {
 export default function B2BRidesPage() {
   const [tab, setTab] = useState<TabKey>("ongoing");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [rides, setRides] = useState<Ride[]>([]);
-
   const [openRideId, setOpenRideId] = useState<string | null>(null);
 
   async function load() {
@@ -76,9 +73,7 @@ export default function B2BRidesPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-slate-900">B2B Rides</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Main action: <span className="font-semibold">Car Handover</span> when driver arrives.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">B2B users can view full ride details.</p>
         </div>
 
         <button
@@ -154,50 +149,17 @@ export default function B2BRidesPage() {
 
       {/* Drawer */}
       {selectedRide ? (
-        <RideDrawerB2B
-          ride={selectedRide}
-          busy={busy}
-          setBusy={setBusy}
-          onClose={() => setOpenRideId(null)}
-          onMutated={load}
-        />
+        <RideDrawerB2BViewOnly ride={selectedRide} onClose={() => setOpenRideId(null)} />
       ) : null}
     </div>
   );
 }
 
-function RideDrawerB2B({
-  ride,
-  busy,
-  setBusy,
-  onClose,
-  onMutated,
-}: {
-  ride: Ride;
-  busy: boolean;
-  setBusy: (v: boolean) => void;
-  onClose: () => void;
-  onMutated: () => void;
-}) {
+function RideDrawerB2BViewOnly({ ride, onClose }: { ride: Ride; onClose: () => void }) {
   const [err, setErr] = useState("");
   const [driverLoc, setDriverLoc] = useState<{ lat: number | null; lng: number | null } | null>(
     null
   );
-
-  const canCarHandover = String(ride.ride_status) === "driver arrived" || String(ride.ride_status) === "DRIVER_ARRIVED";
-
-  async function doCarHandover() {
-    setErr("");
-    setBusy(true);
-    try {
-      await b2bCarHandover(ride._id);
-      await onMutated();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Car handover failed");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function loadDriverLocation() {
     setErr("");
@@ -223,10 +185,10 @@ function RideDrawerB2B({
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="Close" />
 
-      <div className="absolute right-0 top-0 h-full w-full sm:w-[620px] bg-white shadow-xl">
+      <div className="absolute right-0 top-0 h-full w-full sm:w-[680px] bg-white shadow-xl">
         <div className="h-16 border-b border-slate-200 px-5 flex items-center justify-between">
           <div className="min-w-0">
-            <div className="text-sm font-extrabold text-slate-900">Ride</div>
+            <div className="text-sm font-extrabold text-slate-900">Ride Details (B2B)</div>
             <div className="text-xs text-slate-500 truncate">{ride._id}</div>
           </div>
           <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
@@ -250,20 +212,75 @@ function RideDrawerB2B({
               <div className="mt-2 text-sm text-red-800 font-semibold">
                 {ride.EmergencyDescription || "—"}
               </div>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <Field label="Emergency Resolved" value={String(ride.isEmergencyResolved ?? false)} />
+                <Field label="Resolved Time" value={fmtDate(ride.emergency_resolved_time)} />
+              </div>
+              {ride.ops_emergency_notes ? (
+                <div className="mt-3 text-sm text-red-900/80">
+                  <span className="font-semibold">Ops Notes:</span> {ride.ops_emergency_notes}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
+          {/* Route summary */}
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <MapPin size={18} />
               {ride.pickup_location} → {ride.drop_location}
             </div>
             <div className="mt-1 text-xs text-slate-500">Status: {ride.ride_status}</div>
-            <div className="mt-2 text-sm font-extrabold text-slate-900">
-              Fare: {money(ride.fare_estimation || ride.total_fare || 0)}
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <Field label="Fare (Est/Total)" value={`${money(ride.fare_estimation)} / ${money(ride.total_fare)}`} />
+              <Field label="Distance / Time" value={`${ride.distance_estimation ?? "—"} km / ${ride.time_estimations ?? "—"} min`} />
             </div>
           </div>
 
+          {/* Business info */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+              <Briefcase size={18} />
+              Business Meta
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Trip Category" value={ride.tripCategory} />
+              <Field label="Business Category" value={ride.businessCategory} />
+              <Field label="Business Function" value={ride.businessFunction} />
+              <Field label="Fare Model" value={ride.fareModel} />
+              <Field label="Fare Adjustment" value={money(ride.fareAdjustment)} />
+            </div>
+          </div>
+
+          {/* POC */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+              <User size={18} />
+              POC Details
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Pickup POC Name" value={ride.pickupPOC?.name} />
+              <Field label="Pickup POC Phone" value={ride.pickupPOC?.phone} />
+              <Field label="Drop POC Name" value={ride.dropPOC?.name} />
+              <Field label="Drop POC Phone" value={ride.dropPOC?.phone} />
+            </div>
+          </div>
+
+          {/* Car */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+              <Car size={18} />
+              Car Details
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Car No" value={ride.car_details?.car_no} />
+              <Field label="Car Type" value={ride.car_details?.car_type} />
+              <Field label="Car Model" value={ride.car_details?.car_model} />
+              <Field label="Insurance" value={String(ride.car_details?.isInsurance ?? false)} />
+            </div>
+          </div>
+
+          {/* Assigned Driver */}
           <div className="rounded-3xl border border-slate-200 bg-white p-4">
             <div className="text-sm font-extrabold text-slate-900">Assigned Driver</div>
             <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -293,18 +310,13 @@ function RideDrawerB2B({
 
             {driverLoc ? (
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-[11px] font-semibold text-slate-500">Lat</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{driverLoc.lat ?? "—"}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-[11px] font-semibold text-slate-500">Lng</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{driverLoc.lng ?? "—"}</div>
-                </div>
+                <Field label="Driver Lat" value={driverLoc.lat} />
+                <Field label="Driver Lng" value={driverLoc.lng} />
               </div>
             ) : null}
           </div>
 
+          {/* Timing */}
           <div className="rounded-3xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
               <Clock size={18} />
@@ -312,38 +324,14 @@ function RideDrawerB2B({
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Created" value={fmtDate((ride as any).createdAt)} />
               <Field label="Scheduled" value={fmtDate(ride.scheduled_time)} />
               <Field label="Driver arrival" value={fmtDate(ride.driver_arrival_time)} />
               <Field label="Start ride" value={fmtDate(ride.start_ride_time)} />
               <Field label="End ride" value={fmtDate(ride.end_ride_time)} />
               <Field label="Car handover" value={fmtDate(ride.car_handover_time)} />
-            </div>
-          </div>
-
-          {/* CAR HANDOVER MAIN CTA */}
-          <div className="sticky bottom-0 bg-white pt-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-                <ShieldCheck size={18} />
-                Car Handover
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Button works only when status is <span className="font-semibold">DRIVER_ARRIVED</span>.
-              </p>
-
-              <button
-                disabled={!canCarHandover || busy}
-                onClick={doCarHandover}
-                className="mt-3 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                {busy ? "Processing…" : "Confirm Car Handover"}
-              </button>
-
-              {!canCarHandover ? (
-                <div className="mt-2 text-xs text-slate-500">
-                  Current status: <span className="font-semibold">{ride.ride_status}</span>
-                </div>
-              ) : null}
+              <Field label="Cancelled At" value={fmtDate((ride as any).cancelledAt)} />
+              <Field label="Cancellation Reason" value={(ride as any).cancellationReason} />
             </div>
           </div>
         </div>
@@ -356,7 +344,9 @@ function Field({ label, value }: { label: string; value: any }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
       <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-900 break-words">{value ?? "—"}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-900 break-words">
+        {value === null || value === undefined || value === "" ? "—" : String(value)}
+      </div>
     </div>
   );
 }

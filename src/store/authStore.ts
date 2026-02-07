@@ -9,6 +9,8 @@ export type AuthedUser = {
   phoneNumber?: string;
   role: Role;
   profilePicture?: string;
+   isApproved?: boolean;
+  isVerified?: boolean;
 };
 
 type AuthState = {

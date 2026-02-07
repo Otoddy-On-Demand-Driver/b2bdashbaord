@@ -154,6 +154,11 @@ export async function opsRidesByDate(date: string) {
 }
 
 
+// ✅ Add this in src/lib/opsApi.ts
+export async function opsRejectDriverVerification(driverId: string, reason?: string) {
+  const { data } = await api.post(`/ops/drivers/${driverId}/reject`, { reason });
+  return data as { ok: boolean; message: string; reason?: string };
+}
 
 export async function opsGetRide(rideId: string) {
   const { data } = await api.get(`/ops/rides/${rideId}`);

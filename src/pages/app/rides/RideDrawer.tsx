@@ -391,6 +391,14 @@ export default function RideDrawer({
 
   // assignedAt
   const assignedAt = r.driver_assigned_at || r.assigned_at || r.driverAssignedAt || null;
+  // meta (enums set at create time)
+const businessFunction = r.businessFunction ?? r.business_function ?? null;
+const tripCategory = r.tripCategory ?? r.trip_category ?? null;
+const businessCategory = r.businessCategory ?? r.business_category ?? null;
+
+// POC (optional)
+const pickupPOC = r.pickupPOC ?? r.pickup_poc ?? null;
+const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
   // flags
   const flags = [
@@ -603,7 +611,7 @@ export default function RideDrawer({
                 </div>
               </div>
 
-              {/* Schedule + descriptions */}
+              {/* Schedule + descriptiooooons */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
                   <Clock size={18} />
@@ -619,8 +627,28 @@ export default function RideDrawer({
                   <Field label="Ride Description" value={r.RideDescription || "—"} />
                 </div>
               </div>
+   
+{/* Booking Meta (Create-time enums + optional fields) */}
+<div className="rounded-3xl border border-slate-200 bg-white p-4">
+  <div className="text-sm font-extrabold text-slate-900">Booking Meta</div>
 
-              {/* Time Breakdown */}
+  <div className="mt-3 grid grid-cols-2 gap-3">
+    <Field label="Business Function" value={businessFunction || "—"} />
+    <Field label="Trip Category" value={tripCategory || "—"} />
+    <Field label="Business Category" value={businessCategory || "—"} />
+    <Field label="Scheduled Time" value={fmtDate(r.scheduled_time)} />
+  </div>
+
+  <div className="mt-3 grid grid-cols-2 gap-3">
+    <Field label="Pickup POC Name" value={pickupPOC?.name || "—"} />
+    <Field label="Pickup POC Phone" value={pickupPOC?.phone || "—"} />
+    <Field label="Drop POC Name" value={dropPOC?.name || "—"} />
+    <Field label="Drop POC Phone" value={dropPOC?.phone || "—"} />
+  </div>
+</div>
+
+
+              {/* Time  */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
                   <Clock size={18} />
@@ -641,6 +669,8 @@ export default function RideDrawer({
                   <Field label="Assign → Handover" value={diffHrsMin(r.car_handover_time, assignedAt)} />
                 </div>
               </div>
+
+
 
               {/* Car details */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
