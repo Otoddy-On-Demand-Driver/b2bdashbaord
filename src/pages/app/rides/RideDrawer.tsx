@@ -24,10 +24,13 @@ import {
   opsAssignDriver,
   opsSubmitRideReview,
   opsUpdateEmergency,
+  opsDriverCoordinates, // ✅ ADD THIS
+
   type Driver,
   type Ride,
 } from "../../../lib/opsApi";
 import { apiErrorMessage } from "../../../lib/api";
+import { useMap } from "react-leaflet";
 
 // ✅ SOCKET (your existing socket.ts)
 import { socket } from "../../../lib/socket";
@@ -120,6 +123,15 @@ function Field({ label, value }: { label: string; value: any }) {
     </div>
   );
 }
+
+function Recenter({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom(), { animate: true });
+  }, [center[0], center[1]]);
+  return null;
+}
+
 
 function ImageStrip({ urls }: { urls: string[] }) {
   if (!urls || urls.length === 0) {
@@ -278,9 +290,16 @@ export default function RideDrawer({
 
   // ✅ ongoing detection for map
   const isOngoing = useMemo(() => {
-    const s = String(r?.ride_status || "").toLowerCase();
-    return s.includes("ongoing") || s.includes("start") || s === "in progress" || s === "started";
-  }, [r?.ride_status]);
+  const s = String(r?.ride_status || "").toLowerCase();
+  return (
+    s === "driver assigned" ||
+    s === "approved" ||
+    s === "driver arrived" ||
+    s === "ongoing" ||
+    s === "car handed over"
+  );
+}, [r?.ride_status]);
+
 
   // ✅ driver id for filtering socket payloads
   const assignedDriverId = useMemo(() => {
@@ -320,6 +339,54 @@ export default function RideDrawer({
       socket.off("ride:location", onLoc);
     };
   }, [open, rideId, assignedDriverId]);
+
+// ✅ Driver id for GPS polling (matches opsDriverCoordinates().coordinates[].driverId)
+const driverIdForGps = useMemo(() => {
+  const v = r?.AssignedDriver?.driverId || null;
+  return v ? String(v) : null;
+}, [r?.AssignedDriver]);
+
+// ✅ FRONTEND-ONLY LIVE GPS: poll /ops/drivers/coordinates every 5s
+useEffect(() => {
+  if (!open) return;
+
+  let t: any = null;
+
+  async function poll() {
+    if (!driverIdForGps) return;
+
+    try {
+      const resp = await opsDriverCoordinates();
+      const row = (resp.coordinates || []).find(
+        (x) => String(x.driverId) === String(driverIdForGps)
+      );
+
+      if (
+  row &&
+  typeof row.lat === "number" &&
+  typeof row.lng === "number"
+) {
+  setLiveDriverLoc({
+    lat: row.lat,
+    lng: row.lng,
+  });
+}
+
+    } catch {
+      // optional: setErr("GPS fetch failed")
+    }
+  }
+
+  poll(); // initial
+  t = setInterval(poll, 5000);
+
+  return () => {
+    if (t) clearInterval(t);
+  };
+}, [open, driverIdForGps]);
+
+
+
 
   // ✅ open review modal (prefill)
   function openReview() {
@@ -430,6 +497,7 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
           {isOngoing ? (
             <>
               <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }}>
+                  <Recenter center={mapCenter} />
                 <TileLayer
                   attribution="&copy; OpenStreetMap contributors"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

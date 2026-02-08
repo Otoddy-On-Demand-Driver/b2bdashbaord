@@ -6,8 +6,11 @@ import {
   Receipt,
   Settings,
   UserPlus,
-  ClipboardPlus, // ✅ add this
+  ClipboardPlus,
+  BarChart3,   // ✅ Analytics / Interview page
+  FileText,    // ✅ Invoices
 } from "lucide-react";
+
 import type { Role } from "../store/authStore";
 
 export type NavItem = {
@@ -19,24 +22,108 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { key: "home", label: "Overview", to: "/", icon: LayoutDashboard, roles: ["admin","opsteam","b2bclient"] },
-  { key: "rides", label: "Rides", to: "/rides", icon: CarTaxiFront, roles: ["admin","opsteam"] },
+  // ================= DASHBOARD =================
+  {
+    key: "home",
+    label: "Overview",
+    to: "/",
+    icon: LayoutDashboard,
+    roles: ["admin", "opsteam", "b2bclient"],
+  },
 
-  // ✅ NEW: Create Booking
-  { key: "createRide", label: "Create Booking", to: "/rides/create", icon: ClipboardPlus, roles: ["b2bclient","admin","opsteam"] },
+  // ================= RIDES =================
+  {
+    key: "rides",
+    label: "Rides",
+    to: "/rides",
+    icon: CarTaxiFront,
+    roles: ["admin", "opsteam"],
+  },
 
-  { key: "drivers", label: "Drivers", to: "/drivers", icon: Users, roles: ["admin","opsteam"] },
-  { key: "map", label: "Live Map", to: "/map", icon: MapPin, roles: ["admin","opsteam"] },
-  { key: "payments", label: "Payments", to: "/payments", icon: Receipt, roles: ["admin","opsteam","b2bclient"] },
+  {
+    key: "createRide",
+    label: "Create Booking",
+    to: "/rides/create",
+    icon: ClipboardPlus,
+    roles: ["b2bclient", "admin", "opsteam"],
+  },
 
-  { key: "manageUsers", label: "Manage Users", to: "/users/manage", icon: Users, roles: ["admin"] },
-  { key: "createUser", label: "Create Users", to: "/users", icon: UserPlus, roles: ["admin"] },
   {
     key: "b2bRides",
     label: "My Rides",
     to: "/b2b/rides",
     icon: CarTaxiFront,
-  roles: ["b2bclient", "admin", "opsteam"],
+    roles: ["b2bclient", "admin", "opsteam"],
   },
-  { key: "settings", label: "Settings", to: "/settings", icon: Settings, roles: ["admin","opsteam"] },
+
+  // ================= DRIVERS =================
+  {
+    key: "drivers",
+    label: "Drivers",
+    to: "/drivers",
+    icon: Users,
+    roles: ["admin", "opsteam"],
+  },
+
+  // ================= MAP =================
+  {
+    key: "map",
+    label: "Live Map",
+    to: "/map",
+    icon: MapPin,
+    roles: ["admin", "opsteam"],
+  },
+
+  // ================= PAYMENTS =================
+  {
+    key: "payments",
+    label: "Payments",
+    to: "/payments",
+    icon: Receipt,
+    roles: ["admin", "opsteam", "b2bclient"],
+  },
+
+  // ================= INVOICES =================
+  {
+    key: "invoices",
+    label: "Invoices",
+    to: "/invoices",
+    icon: FileText,
+    roles: ["admin", "opsteam", "b2bclient"],
+  },
+
+  // ================= ANALYTICS / INTERVIEW PAGE =================
+  {
+    key: "analytics",
+    label: "Analytics & Reports",
+    to: "/analytics",   // ← You will create this page
+    icon: BarChart3,
+    roles: ["admin", "opsteam", "b2bclient"],
+  },
+
+  // ================= USERS =================
+  {
+    key: "manageUsers",
+    label: "Manage Users",
+    to: "/users/manage",
+    icon: Users,
+    roles: ["admin"],
+  },
+
+  {
+    key: "createUser",
+    label: "Create Users",
+    to: "/users",
+    icon: UserPlus,
+    roles: ["admin"],
+  },
+
+  // ================= SETTINGS =================
+  {
+    key: "settings",
+    label: "Settings",
+    to: "/settings",
+    icon: Settings,
+    roles: ["admin", "opsteam"],
+  },
 ];

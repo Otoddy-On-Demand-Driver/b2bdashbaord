@@ -1,29 +1,43 @@
 // src/lib/invoicesApi.ts
-import { api } from "./api"; // <- your axios instance
+import { api } from "./api";
+
+export const INVOICE_TYPES = ["ride", "monthly"] as const;
+export type InvoiceType = (typeof INVOICE_TYPES)[number];
+
+export const INVOICE_STATUSES = ["issued", "paid", "void"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+export const INVOICE_REF_TYPES = ["ride"] as const;
+export type InvoiceRefType = (typeof INVOICE_REF_TYPES)[number];
 
 export type InvoiceItem = {
-  refType: "ride";
+  refType: InvoiceRefType; // "ride"
   refId: string;
   description: string;
-  amount: number;
-  taxAmount: number;
-  total: number;
+  amount: number;     // base amount
+  taxAmount: number;  // tax
+  total: number;      // amount + tax
   meta?: any;
 };
 
 export type Invoice = {
   _id: string;
-  type: "ride" | "monthly";
+  type: InvoiceType; // "ride" | "monthly"
   invoiceNo: string;
+
   companyId: string;
   rideId?: string;
+
   issuedAt?: string;
-  periodStart?: string;
+  periodStart?: string; // for monthly
   periodEnd?: string;
-  status: "issued" | "paid" | "void";
+
+  status: InvoiceStatus; // "issued" | "paid" | "void"
+
   subtotal: number;
   taxTotal: number;
   grandTotal: number;
+
   pdfPath?: string;
   items: InvoiceItem[];
 };
@@ -37,7 +51,7 @@ export async function getInvoice(invoiceId: string): Promise<Invoice> {
 /* -------------------- list invoices -------------------- */
 export async function listInvoices(params: {
   companyId?: string;
-  type?: "ride" | "monthly";
+  type?: InvoiceType;
   month?: number;
   year?: number;
 }): Promise<Invoice[]> {
@@ -48,7 +62,7 @@ export async function listInvoices(params: {
 /* -------------------- generate monthly -------------------- */
 export async function generateMonthlyInvoice(payload: {
   companyId: string;
-  month: number;
+  month: number; // 1-12
   year: number;
 }): Promise<Invoice> {
   const { data } = await api.post(`/invoices/monthly/generate`, payload);
@@ -57,6 +71,7 @@ export async function generateMonthlyInvoice(payload: {
 
 /* -------------------- open / download pdf -------------------- */
 export function openInvoicePdf(invoiceId: string) {
-  const url = `${import.meta.env.VITE_API_BASE_URL}/invoices/${invoiceId}/pdf`;
+  const base = import.meta.env.VITE_API_BASE_URL;
+  const url = `${base}/invoices/${invoiceId}/pdf`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
