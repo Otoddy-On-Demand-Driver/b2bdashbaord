@@ -1,0 +1,40 @@
+name: CI/CD Deployment Pipeline (B2B-OTOddy Backend)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 15m
+          script_stop: true
+          script: |
+            set -e
+            echo "✅ Connected to EC2"
+            cd /home/ec2-user/b2bdashbaord
+            sudo rm -rf /var/www/b2bdashboard/*
+            sudo cp -r ~/dist/* /var/www/b2bdashboard/
+            sudo rm -rf ~/dist
+
+            sudo chown -R nginx:nginx /var/www/b2bdashboard
+            sudo chmod -R 755 /var/www/b2bdashboard
+
+            sudo systemctl reload nginx
+
+            echo "✅ Frontend deployment completed successfully"
