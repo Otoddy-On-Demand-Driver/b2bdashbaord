@@ -7,7 +7,7 @@ import {
   Settings,
   UserPlus,
   ClipboardPlus,
-  BarChart3,   // ✅ Analytics / Interview page
+
   FileText,    // ✅ Invoices
 } from "lucide-react";
 
@@ -80,7 +80,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Payments",
     to: "/payments",
     icon: Receipt,
-    roles: ["admin", "opsteam", "b2bclient"],
+    roles: ["admin", "opsteam"],
   },
 
   // ================= INVOICES =================
@@ -92,14 +92,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "opsteam", "b2bclient"],
   },
 
-  // ================= ANALYTICS / INTERVIEW PAGE =================
-  {
-    key: "analytics",
-    label: "Analytics & Reports",
-    to: "/analytics",   // ← You will create this page
-    icon: BarChart3,
-    roles: ["admin", "opsteam", "b2bclient"],
-  },
+ 
 
   // ================= USERS =================
   {

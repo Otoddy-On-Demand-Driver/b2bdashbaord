@@ -72,6 +72,11 @@ export async function generateMonthlyInvoice(payload: {
 /* -------------------- open / download pdf -------------------- */
 export function openInvoicePdf(invoiceId: string) {
   const base = import.meta.env.VITE_API_BASE_URL;
-  const url = `${base}/invoices/${invoiceId}/pdf`;
+  const url = `${base}invoices/${invoiceId}/pdf`;
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export async function generateRideInvoice(payload: { rideId: string; companyId: string }) {
+  const { data } = await api.post(`/invoices/ride/generate`, payload);
+  return data.invoice as Invoice;
 }

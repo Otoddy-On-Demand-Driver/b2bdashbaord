@@ -16,6 +16,31 @@ import { AlertTriangle } from "lucide-react";
 
 // ✅ socket helper (create this if not present)
 import { socket } from "../../lib/socket";
+import { api } from "../../lib/api"; // ✅ add (same axios instance)
+
+const API_BASE = (api as any)?.defaults?.baseURL || "";
+
+function absUrl(u: string) {
+  if (!u) return u;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (!API_BASE) return u;
+  return `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`;
+}
+
+function pickImages(r: any) {
+  const startRaw: string[] = Array.isArray(r?.start_car_images)
+    ? r.start_car_images
+    : Array.isArray(r?.start_car_images_)
+    ? r.start_car_images_
+    : [];
+
+  const endRaw: string[] = Array.isArray(r?.end_car_images) ? r.end_car_images : [];
+
+  return {
+    start: startRaw.map(absUrl).slice(0, 4),
+    end: endRaw.map(absUrl).slice(0, 4),
+  };
+}
 
 const TABS: { key: "upcoming" | "ongoing" | "completed" | "cancelled" | "byDate"; label: string }[] = [
   { key: "upcoming", label: "Upcoming" },
@@ -33,17 +58,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// ✅ helper: tab-based filter (best-effort based on your RideStatus union)
-function matchesTab(tab: (typeof TABS)[number]["key"], ride: any) {
-  const st = String(ride?.ride_status || "").toLowerCase();
 
-  if (tab === "upcoming") return st.includes("waiting");
-  if (tab === "ongoing") return st.includes("ongoing") || st.includes("approved") || st.includes("arrived") || st.includes("handed");
-  if (tab === "completed") return st.includes("completed");
-  if (tab === "cancelled") return st.includes("cancelled");
-  // byDate handled by server fetch; live update here is still ok (we won’t force add)
-  return true;
-}
 
 export default function RidesPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("upcoming");
@@ -239,11 +254,57 @@ export default function RidesPage() {
                 }`}
               >
                 <div className="col-span-4">
-                  <div className="text-sm font-semibold text-slate-900 truncate">
-                    {r.pickup_location} → {r.drop_location}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 truncate">#{r._id}</div>
-                </div>
+  <div className="text-sm font-semibold text-slate-900 truncate">
+    {r.pickup_location} → {r.drop_location}
+  </div>
+  <div className="mt-1 text-xs text-slate-500 truncate">#{r._id}</div>
+
+  {/* ✅ Start + End images preview (4 + 4) */}
+  {(() => {
+    const imgs = pickImages(r);
+    const hasAny = imgs.start.length || imgs.end.length;
+    if (!hasAny) return null;
+
+    return (
+      <div className="mt-2 flex flex-col gap-2">
+        {/* Start */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-500 w-12">Start</span>
+          <div className="flex gap-2 overflow-auto">
+            {imgs.start.map((u, idx) => (
+              <a key={u + idx} href={u} target="_blank" rel="noreferrer" className="block">
+                <img
+                  src={u}
+                  alt={`start-${idx}`}
+                  className="h-10 w-14 rounded-lg object-cover border border-slate-200"
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* End */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-500 w-12">End</span>
+          <div className="flex gap-2 overflow-auto">
+            {imgs.end.map((u, idx) => (
+              <a key={u + idx} href={u} target="_blank" rel="noreferrer" className="block">
+                <img
+                  src={u}
+                  alt={`end-${idx}`}
+                  className="h-10 w-14 rounded-lg object-cover border border-slate-200"
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
+</div>
+
 
                 <div className="col-span-2 flex items-center gap-2">
                   {r.isEmergency ? (

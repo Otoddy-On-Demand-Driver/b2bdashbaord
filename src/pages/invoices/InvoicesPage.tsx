@@ -14,9 +14,13 @@ import {
 import { apiErrorMessage } from "../../lib/api";
 
 const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(n || 0);
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
 
-const MONTHS = Array.from({ length: 12 }).map((_, i) => i + 1);
+// Allow "All Months"
+const MONTHS: Array<{ label: string; value: number | "" }> = [
+  { label: "All Months", value: "" },
+  ...Array.from({ length: 12 }).map((_, i) => ({ label: String(i + 1), value: i + 1 })),
+];
 
 export default function InvoicesPage() {
   const nav = useNavigate();
@@ -29,7 +33,7 @@ export default function InvoicesPage() {
   const [companyId, setCompanyId] = useState("");
   const [type, setType] = useState<"" | InvoiceType>("");
   const [status, setStatus] = useState<"" | InvoiceStatus>("");
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [month, setMonth] = useState<number | "">(new Date().getMonth() + 1); // default current month
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [q, setQ] = useState("");
 
@@ -38,17 +42,31 @@ export default function InvoicesPage() {
       setLoading(true);
       setError("");
 
-      // backend filter support only for companyId/type/month/year in your current API
-      const data = await listInvoices({
-        companyId: companyId || undefined,
-        type: type || undefined,
-        month,
-        year,
-      });
+      // API supports companyId/type/month/year only
+      // Keep month/year optional (All Months) + avoid forcing month/year for ride invoices by default
+      const params: {
+        companyId?: string;
+        type?: InvoiceType;
+        month?: number;
+        year?: number;
+      } = {
+        companyId: companyId.trim() || undefined,
+        type: (type || undefined) as any,
+      };
 
-      setRows(data);
+      // Apply month/year only when:
+      // - month is selected (not "All Months")
+      // - and year is valid
+      if (month !== "" && Number.isFinite(year)) {
+        params.month = month;
+        params.year = year;
+      }
+
+      const data = await listInvoices(params);
+      setRows(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(apiErrorMessage(e));
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -56,13 +74,20 @@ export default function InvoicesPage() {
 
   async function onGenerateMonthly() {
     try {
-      if (!companyId.trim()) return;
+      const cid = companyId.trim();
+      if (!cid) return;
+
+      // Monthly invoice needs a concrete month
+      if (month === "") {
+        setError("Select a month to generate a monthly invoice.");
+        return;
+      }
 
       setLoading(true);
       setError("");
 
       const inv = await generateMonthlyInvoice({
-        companyId: companyId.trim(),
+        companyId: cid,
         month,
         year,
       });
@@ -83,7 +108,7 @@ export default function InvoicesPage() {
   // client-side filters (status + search)
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return rows.filter((inv) => {
+    return (rows || []).filter((inv) => {
       if (status && inv.status !== status) return false;
       if (!s) return true;
 
@@ -118,9 +143,7 @@ export default function InvoicesPage() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Invoices</h1>
-          <div className="text-sm text-gray-600 mt-1">
-            Filter + generate monthly invoice + PDF export.
-          </div>
+          <div className="text-sm text-gray-600 mt-1">Filter + monthly invoice + PDF export</div>
         </div>
 
         <div className="flex gap-2">
@@ -134,9 +157,15 @@ export default function InvoicesPage() {
 
           <button
             className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
-            disabled={!companyId.trim() || loading}
+            disabled={!companyId.trim() || loading || month === ""}
             onClick={onGenerateMonthly}
-            title={!companyId.trim() ? "Enter Company ID first" : ""}
+            title={
+              !companyId.trim()
+                ? "Enter Company ID first"
+                : month === ""
+                  ? "Select a month"
+                  : ""
+            }
           >
             Generate Monthly Invoice
           </button>
@@ -181,11 +210,14 @@ export default function InvoicesPage() {
         <select
           className="border rounded px-3 py-2"
           value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
+          onChange={(e) => {
+            const v = e.target.value;
+            setMonth(v === "" ? "" : Number(v));
+          }}
         >
           {MONTHS.map((m) => (
-            <option key={m} value={m}>
-              {m}
+            <option key={String(m.value)} value={m.value}>
+              {m.label}
             </option>
           ))}
         </select>
@@ -235,7 +267,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {error && <div className="text-red-600 mt-3">{error}</div>}
+      {error ? <div className="text-red-600 mt-3">{error}</div> : null}
 
       {/* Table */}
       <div className="mt-4 border rounded-xl overflow-auto">
@@ -259,42 +291,44 @@ export default function InvoicesPage() {
                   Loading...
                 </td>
               </tr>
-            ) : filtered.map((inv) => (
-              <tr key={inv._id} className="border-t">
-                <td className="p-2 font-medium">{inv.invoiceNo}</td>
-                <td className="p-2">{inv.type}</td>
-                <td className="p-2">{inv.status}</td>
-                <td className="p-2">{inv.companyId}</td>
-                <td className="p-2">{inr(inv.grandTotal)}</td>
-                <td className="p-2">
-                  {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}
-                </td>
-                <td className="p-2 text-right">
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      className="border px-2 py-1 rounded hover:bg-gray-50"
-                      onClick={() => nav(`/invoices/${inv._id}`)}
-                    >
-                      Open
-                    </button>
-                    <button
-                      className="border px-2 py-1 rounded hover:bg-gray-50"
-                      onClick={() => openInvoicePdf(inv._id)}
-                    >
-                      PDF
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            ) : (
+              filtered.map((inv) => (
+                <tr key={inv._id} className="border-t">
+                  <td className="p-2 font-medium">{inv.invoiceNo}</td>
+                  <td className="p-2">{inv.type}</td>
+                  <td className="p-2">{inv.status}</td>
+                  <td className="p-2">{inv.companyId}</td>
+                  <td className="p-2">{inr(inv.grandTotal)}</td>
+                  <td className="p-2">
+                    {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}
+                  </td>
+                  <td className="p-2 text-right">
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        className="border px-2 py-1 rounded hover:bg-gray-50"
+                        onClick={() => nav(`/invoices/${inv._id}`)}
+                      >
+                        Open
+                      </button>
+                      <button
+                        className="border px-2 py-1 rounded hover:bg-gray-50"
+                        onClick={() => openInvoicePdf(inv._id)}
+                      >
+                        PDF
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
 
-            {!filtered.length && !loading && (
+            {!filtered.length && !loading ? (
               <tr>
                 <td colSpan={7} className="p-4 text-center text-gray-500">
                   No invoices found
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>

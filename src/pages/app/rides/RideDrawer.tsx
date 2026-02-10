@@ -453,7 +453,11 @@ useEffect(() => {
   const dropLng = r.drop_longitude;
 
   // images
-  const startImgs: string[] = Array.isArray(r.start_car_images) ? r.start_car_images : [];
+const startImgs: string[] = Array.isArray(r.start_car_images)
+  ? r.start_car_images
+  : Array.isArray(r.start_car_images_)
+  ? r.start_car_images_
+  : [];
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
   // assignedAt

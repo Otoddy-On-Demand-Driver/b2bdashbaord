@@ -54,6 +54,35 @@ const pinIcon = new L.Icon({
   iconAnchor: [12, 41],
 });
 
+/* ----------------------------- Images helpers (NEW) ----------------------------- */
+function normalizeUrls(v: any): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean).map(String);
+  if (typeof v === "string") return v ? [v] : [];
+  return [];
+}
+
+function ImageGrid({ urls }: { urls: string[] }) {
+  if (!urls.length) return <div className="text-xs text-slate-500">No images.</div>;
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {urls.map((u, idx) => (
+        <a
+          key={`${u}-${idx}`}
+          href={u}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-2xl border border-slate-200 bg-white"
+          title="Open image"
+        >
+          <img src={u} alt={`car-${idx}`} className="h-36 w-full object-cover" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export default function B2BRidesPage() {
   const [tab, setTab] = useState<TabKey>("ongoing");
   const [loading, setLoading] = useState(true);
@@ -162,10 +191,10 @@ export default function B2BRidesPage() {
               <div className="col-span-3 text-sm text-slate-700">{r.ride_status}</div>
 
               <div className="col-span-2 text-sm font-semibold text-slate-900">
-                {money(r.fare_estimation || r.total_fare || 0)}
+                {money((r as any).fare_estimation || (r as any).total_fare || 0)}
               </div>
 
-              <div className="col-span-2 text-xs text-slate-500">{fmtDate(r.scheduled_time)}</div>
+              <div className="col-span-2 text-xs text-slate-500">{fmtDate((r as any).scheduled_time)}</div>
             </button>
           ))
         )}
@@ -180,10 +209,11 @@ export default function B2BRidesPage() {
 }
 
 /**
- * ✅ B2B View-Only Drawer WITH LEFT LIVE MAP
+ * ✅ B2B View-Only Drawer WITH LEFT LIVE MAP + Start/End Ride Images
  * - Desktop: Left = map, Right = details
- * - Mobile: Map hidden (you can enable if you want)
+ * - Mobile: Map hidden
  * - Live driver location: polls backend every 5s using b2bFetchDriverLocation(driverId)
+ * - Images: uses ride.start_car_images_ and ride.end_car_images (NO schema change)
  */
 function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClose: () => void }) {
   const [err, setErr] = useState("");
@@ -203,11 +233,14 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
   const dropLat = safeNum((ride as any).drop_latitude);
   const dropLng = safeNum((ride as any).drop_longitude);
 
-  const driverId = ride?.AssignedDriver?.driverId || null;
+  const driverId = (ride as any)?.AssignedDriver?.driverId || null;
+
+  // ✅ Images (NO rename, keep as-is)
+  const startImages = normalizeUrls((ride as any).start_car_images_);
+  const endImages = normalizeUrls((ride as any).end_car_images);
 
   const isTrackable = useMemo(() => {
-    // You can tighten this logic if you only want ongoing rides to show tracking
-    const s = String(ride?.ride_status || "").toLowerCase();
+    const s = String((ride as any)?.ride_status || "").toLowerCase();
     const hasDriver = !!driverId;
     const looksOngoing =
       s.includes("driver assigned") ||
@@ -216,11 +249,11 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
       s.includes("car handed over") ||
       s.includes("approved");
     return hasDriver && looksOngoing;
-  }, [ride?.ride_status, driverId]);
+  }, [(ride as any)?.ride_status, driverId]);
 
   async function fetchDriverOnce() {
     setErr("");
-    const rid = rideRef.current;
+    const rid = rideRef.current as any;
     const did = rid?.AssignedDriver?.driverId;
     if (!did) {
       setDriverLoc(null);
@@ -228,7 +261,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
     }
     try {
       const r = await b2bFetchDriverLocation(did);
-      setDriverLoc({ lat: r.lat ?? null, lng: r.lng ?? null });
+      setDriverLoc({ lat: (r as any).lat ?? null, lng: (r as any).lng ?? null });
     } catch (e: any) {
       setErr(e?.message || "Failed to fetch driver location");
     }
@@ -362,7 +395,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
           <div className="h-16 border-b border-slate-200 px-5 flex items-center justify-between">
             <div className="min-w-0">
               <div className="text-sm font-extrabold text-slate-900">Ride Details (B2B)</div>
-              <div className="text-xs text-slate-500 truncate">{ride._id}</div>
+              <div className="text-xs text-slate-500 truncate">{(ride as any)._id}</div>
             </div>
             <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
               <X />
@@ -376,17 +409,17 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
               </div>
             ) : null}
 
-            {ride.isEmergency ? (
+            {(ride as any).isEmergency ? (
               <div className="rounded-3xl border border-red-300 bg-red-50 p-4">
                 <div className="flex items-center gap-2 text-red-700">
                   <AlertTriangle size={18} />
                   <div className="text-sm font-extrabold">Emergency</div>
                 </div>
                 <div className="mt-2 text-sm text-red-800 font-semibold">
-                  {ride.EmergencyDescription || "—"}
+                  {(ride as any).EmergencyDescription || "—"}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-3">
-                  <Field label="Emergency Resolved" value={String(ride.isEmergencyResolved ?? false)} />
+                  <Field label="Emergency Resolved" value={String((ride as any).isEmergencyResolved ?? false)} />
                   <Field label="Resolved Time" value={fmtDate((ride as any).emergency_resolved_time)} />
                 </div>
                 {(ride as any).ops_emergency_notes ? (
@@ -401,13 +434,13 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <MapPin size={18} />
-                {ride.pickup_location} → {ride.drop_location}
+                {(ride as any).pickup_location} → {(ride as any).drop_location}
               </div>
-              <div className="mt-1 text-xs text-slate-500">Status: {ride.ride_status}</div>
+              <div className="mt-1 text-xs text-slate-500">Status: {(ride as any).ride_status}</div>
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <Field
                   label="Fare (Est/Total)"
-                  value={`${money(ride.fare_estimation)} / ${money(ride.total_fare)}`}
+                  value={`${money((ride as any).fare_estimation)} / ${money((ride as any).total_fare)}`}
                 />
                 <Field
                   label="Distance / Time"
@@ -452,10 +485,25 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
                 Car Details
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label="Car No" value={ride.car_details?.car_no} />
-                <Field label="Car Type" value={ride.car_details?.car_type} />
-                <Field label="Car Model" value={ride.car_details?.car_model} />
-                <Field label="Insurance" value={String(ride.car_details?.isInsurance ?? false)} />
+                <Field label="Car No" value={(ride as any).car_details?.car_no} />
+                <Field label="Car Type" value={(ride as any).car_details?.car_type} />
+                <Field label="Car Model" value={(ride as any).car_details?.car_model} />
+                <Field label="Insurance" value={String((ride as any).car_details?.isInsurance ?? false)} />
+              </div>
+            </div>
+
+            {/* ✅ NEW: Start/End Ride Images (uses schema as-is) */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+              <div className="text-sm font-extrabold text-slate-900">Car Images</div>
+
+              <div className="mt-3">
+                <div className="text-xs font-semibold text-slate-500 mb-2">Start Ride Images</div>
+                <ImageGrid urls={startImages} />
+              </div>
+
+              <div className="mt-5">
+                <div className="text-xs font-semibold text-slate-500 mb-2">End Ride Images</div>
+                <ImageGrid urls={endImages} />
               </div>
             </div>
 
@@ -463,9 +511,9 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
             <div className="rounded-3xl border border-slate-200 bg-white p-4">
               <div className="text-sm font-extrabold text-slate-900">Assigned Driver</div>
               <div className="mt-2 text-sm font-semibold text-slate-900">
-                {ride.AssignedDriver?.name || "Not assigned"}
+                {(ride as any).AssignedDriver?.name || "Not assigned"}
               </div>
-              <div className="text-xs text-slate-500">{ride.AssignedDriver?.number || "—"}</div>
+              <div className="text-xs text-slate-500">{(ride as any).AssignedDriver?.number || "—"}</div>
 
               <div className="mt-3 flex gap-2">
                 <button
@@ -508,11 +556,11 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
 
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Field label="Created" value={fmtDate((ride as any).createdAt)} />
-                <Field label="Scheduled" value={fmtDate(ride.scheduled_time)} />
-                <Field label="Driver arrival" value={fmtDate(ride.driver_arrival_time)} />
-                <Field label="Start ride" value={fmtDate(ride.start_ride_time)} />
-                <Field label="End ride" value={fmtDate(ride.end_ride_time)} />
-                <Field label="Car handover" value={fmtDate(ride.car_handover_time)} />
+                <Field label="Scheduled" value={fmtDate((ride as any).scheduled_time)} />
+                <Field label="Driver arrival" value={fmtDate((ride as any).driver_arrival_time)} />
+                <Field label="Start ride" value={fmtDate((ride as any).start_ride_time)} />
+                <Field label="End ride" value={fmtDate((ride as any).end_ride_time)} />
+                <Field label="Car handover" value={fmtDate((ride as any).car_handover_time)} />
                 <Field label="Cancelled At" value={fmtDate((ride as any).cancelledAt)} />
                 <Field label="Cancellation Reason" value={(ride as any).cancellationReason} />
               </div>
