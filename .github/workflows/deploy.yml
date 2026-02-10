@@ -25,7 +25,7 @@ jobs:
           command_timeout: 15m
           script_stop: true
           script: |
-            cd b2bdashboard
+            cd /home/ec2-user/b2bdashbaord
             npm install
             npm run build
             sudo rm -rf /var/www/b2bdashboard/*
