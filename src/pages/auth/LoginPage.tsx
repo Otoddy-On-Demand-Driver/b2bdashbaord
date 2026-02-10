@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-6">
-          <div className="text-2xl font-extrabold tracking-tight text-slate-900">OTOddy Dashboard</div>
+          <div className="text-2xl font-extrabold tracking-tight text-slate-900">OTOddy Bussiness Portal</div>
           <div className="mt-1 text-sm text-slate-600">Sign in to continue.</div>
         </div>
 
