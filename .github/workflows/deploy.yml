@@ -27,7 +27,9 @@ jobs:
           script: |
             set -e
             echo "✅ Connected to EC2"
-            cd /home/ec2-user/b2bdashbaord
+            cd /home/ec2-user/b2bdashboard
+            npm install
+            nom run build
             sudo rm -rf /var/www/b2bdashboard/*
             sudo cp -r ~/dist/* /var/www/b2bdashboard/
             sudo rm -rf ~/dist
