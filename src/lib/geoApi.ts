@@ -1,4 +1,7 @@
 // src/lib/geoApi.ts
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+console.log("ENV BASE:", API_BASE);  // 👈 yahin add karo
 export type OlaSuggestion = {
   label: string;
   place_id: string | null;
@@ -8,7 +11,7 @@ export type OlaSuggestion = {
 
 export async function geoAutocomplete(params: {
   input: string;
-  location?: string; // "lat,lng"
+  location?: string;
   radius?: number;
   limit?: number;
 }) {
@@ -18,12 +21,16 @@ export async function geoAutocomplete(params: {
   if (params.radius) qs.set("radius", String(params.radius));
   if (params.limit) qs.set("limit", String(params.limit));
 
-  const resp = await fetch(`/api/geo/autocomplete?${qs.toString()}`, {
-    method: "GET",
-    credentials: "include",
-  });
+  const resp = await fetch(
+    `${API_BASE}api/geo/autocomplete?${qs.toString()}`,
+    {
+      method: "GET",
+      credentials: "include",
+    }
+  );
 
   const data = await resp.json().catch(() => null);
+
   if (!resp.ok || !data?.ok) {
     throw new Error(data?.error || "Geo autocomplete failed");
   }
