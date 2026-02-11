@@ -5,6 +5,8 @@ import {
   type CreateRidePayload,
   type CreateBulkRidePayload,
 } from "../lib/ridesApi";
+import LocationAutocomplete from "../components/LocationAutocomplete";
+import type { OlaSuggestion } from "../lib/geoApi";
 
 /** Frontend mirror of backend enums (must match EXACT strings) */
 const BUSINESS_FUNCTION_VALUES = [
@@ -96,6 +98,14 @@ export default function CreateBooking() {
     isInsurance: false,
   });
 
+  const pickupBias = useMemo(() => {
+    const lat = Number(form.pickup_latitude);
+    const lng = Number(form.pickup_longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+    return `${lat},${lng}`;
+  }, [form.pickup_latitude, form.pickup_longitude]);
+
+
   function addCar() {
     if (cars.length >= 10) return;
     setCars((prev) => [...prev, { car_no: "", car_type: "", car_model: "", isInsurance: false }]);
@@ -158,17 +168,17 @@ export default function CreateBooking() {
         pickupPOC:
           form.pickupPOC.name.trim() || form.pickupPOC.phone.trim()
             ? {
-                name: form.pickupPOC.name.trim() || null,
-                phone: form.pickupPOC.phone.trim() || null,
-              }
+              name: form.pickupPOC.name.trim() || null,
+              phone: form.pickupPOC.phone.trim() || null,
+            }
             : undefined,
 
         dropPOC:
           form.dropPOC.name.trim() || form.dropPOC.phone.trim()
             ? {
-                name: form.dropPOC.name.trim() || null,
-                phone: form.dropPOC.phone.trim() || null,
-              }
+              name: form.dropPOC.name.trim() || null,
+              phone: form.dropPOC.phone.trim() || null,
+            }
             : undefined,
       };
 
@@ -230,18 +240,16 @@ export default function CreateBooking() {
               <button
                 type="button"
                 onClick={() => setIsBulk(false)}
-                className={`h-10 px-4 rounded-2xl text-sm font-semibold ${
-                  !isBulk ? "bg-black text-white" : "bg-black/5 text-black"
-                }`}
+                className={`h-10 px-4 rounded-2xl text-sm font-semibold ${!isBulk ? "bg-black text-white" : "bg-black/5 text-black"
+                  }`}
               >
                 Single Booking
               </button>
               <button
                 type="button"
                 onClick={() => setIsBulk(true)}
-                className={`h-10 px-4 rounded-2xl text-sm font-semibold ${
-                  isBulk ? "bg-black text-white" : "bg-black/5 text-black"
-                }`}
+                className={`h-10 px-4 rounded-2xl text-sm font-semibold ${isBulk ? "bg-black text-white" : "bg-black/5 text-black"
+                  }`}
               >
                 Bulk Booking
               </button>
@@ -288,14 +296,23 @@ export default function CreateBooking() {
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <div className={labelCls}>Pickup Location</div>
-                  <input
-                    className={inputCls + " mt-2"}
-                    value={form.pickup_location}
-                    onChange={(e) => setForm({ ...form, pickup_location: e.target.value })}
-                    placeholder="e.g. Sector 62, Noida"
-                  />
-                </div>
+  <LocationAutocomplete
+    label="Pickup Location"
+    labelClassName={labelCls}
+    inputClassName={inputCls + " mt-2"}
+    value={form.pickup_location}
+    onChangeText={(text) => setForm({ ...form, pickup_location: text })}
+    onSelect={(s: OlaSuggestion) =>
+      setForm((prev) => ({
+        ...prev,
+        pickup_location: s.label,
+        pickup_latitude: String(s.lat),
+        pickup_longitude: String(s.lng),
+      }))
+    }
+  />
+</div>
+
 
                 <div>
                   <div className={labelCls}>Pickup Latitude</div>
@@ -357,14 +374,25 @@ export default function CreateBooking() {
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <div className={labelCls}>Drop Location</div>
-                  <input
-                    className={inputCls + " mt-2"}
-                    value={form.drop_location}
-                    onChange={(e) => setForm({ ...form, drop_location: e.target.value })}
-                    placeholder="e.g. Cyber Hub, Gurugram"
-                  />
-                </div>
+  <LocationAutocomplete
+    label="Drop Location"
+    labelClassName={labelCls}
+    inputClassName={inputCls + " mt-2"}
+    value={form.drop_location}
+    onChangeText={(text) => setForm({ ...form, drop_location: text })}
+    biasLocation={pickupBias}   // optional but recommended
+    radius={25000}              // optional
+    onSelect={(s: OlaSuggestion) =>
+      setForm((prev) => ({
+        ...prev,
+        drop_location: s.label,
+        drop_latitude: String(s.lat),
+        drop_longitude: String(s.lng),
+      }))
+    }
+  />
+</div>
+
 
                 <div>
                   <div className={labelCls}>Drop Latitude</div>

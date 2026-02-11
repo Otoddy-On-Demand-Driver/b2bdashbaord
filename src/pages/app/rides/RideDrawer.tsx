@@ -134,32 +134,119 @@ function Recenter({ center }: { center: [number, number] }) {
 
 
 function ImageStrip({ urls }: { urls: string[] }) {
-  if (!urls || urls.length === 0) {
-    return <div className="text-sm text-slate-500">No images</div>;
-  }
+  const safe = Array.isArray(urls) ? urls.filter(Boolean) : [];
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+
+  if (!safe.length) return <div className="text-sm text-slate-500">No images</div>;
+
+  const close = () => setOpen(false);
+  const prev = () => setActive((i) => (i - 1 + safe.length) % safe.length);
+  const next = () => setActive((i) => (i + 1) % safe.length);
 
   return (
-    <div className="flex gap-3 overflow-auto pb-1">
-      {urls.map((u, idx) => (
-        <a
-          key={u + idx}
-          href={u}
-          target="_blank"
-          rel="noreferrer"
-          className="group relative h-24 w-32 flex-shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-          title="Open image"
-        >
-          <img
-            src={u}
-            alt={`car-${idx}`}
-            className="h-full w-full object-cover transition group-hover:scale-[1.03]"
-            loading="lazy"
+    <>
+      <div className="flex gap-3 overflow-auto pb-1">
+        {safe.map((u, idx) => (
+          <button
+            key={u + idx}
+            type="button"
+            onClick={() => {
+              setActive(idx);
+              setOpen(true);
+            }}
+            className="group relative h-24 w-32 flex-shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+            title="Preview"
+          >
+            <img
+              src={u}
+              alt={`car-${idx}`}
+              className="h-full w-full object-cover transition group-hover:scale-[1.03]"
+              loading="lazy"
+            />
+          </button>
+        ))}
+      </div>
+
+      {/* ✅ Lightbox */}
+      {open ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <button
+            className="absolute inset-0 bg-black/70"
+            onClick={close}
+            aria-label="Close preview"
           />
-        </a>
-      ))}
-    </div>
+
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="text-sm font-extrabold text-slate-900">
+                Preview ({active + 1}/{safe.length})
+              </div>
+              <button
+                onClick={close}
+                className="rounded-xl p-2 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="relative bg-black flex items-center justify-center">
+  <img
+    src={safe[active]}
+    alt={`preview-${active}`}
+    className="max-h-[75vh] max-w-[95vw] object-contain"
+  />
+</div>
+
+
+            {/* Footer actions */}
+            <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-4 py-3">
+              <a
+                href={safe[active]}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-slate-700 underline"
+              >
+                Open in new tab
+              </a>
+
+              {safe.length > 1 ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={prev}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                    type="button"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    onClick={next}
+                    className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                    type="button"
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={close}
+                  className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  type="button"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
+
 
 /* ----------------------------- Component ----------------------------- */
 export default function RideDrawer({

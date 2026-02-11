@@ -63,25 +63,134 @@ function normalizeUrls(v: any): string[] {
 }
 
 function ImageGrid({ urls }: { urls: string[] }) {
-  if (!urls.length) return <div className="text-xs text-slate-500">No images.</div>;
+  const safe = Array.isArray(urls) ? urls.filter(Boolean).map(String) : [];
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+
+  if (!safe.length) return <div className="text-xs text-slate-500">No images.</div>;
+
+  const close = () => setOpen(false);
+  const prev = () => setActive((i) => (i - 1 + safe.length) % safe.length);
+  const next = () => setActive((i) => (i + 1) % safe.length);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {urls.map((u, idx) => (
-        <a
-          key={`${u}-${idx}`}
-          href={u}
-          target="_blank"
-          rel="noreferrer"
-          className="block overflow-hidden rounded-2xl border border-slate-200 bg-white"
-          title="Open image"
-        >
-          <img src={u} alt={`car-${idx}`} className="h-36 w-full object-cover" />
-        </a>
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {safe.map((u, idx) => (
+          <button
+            key={`${u}-${idx}`}
+            type="button"
+            onClick={() => {
+              setActive(idx);
+              setOpen(true);
+            }}
+            className="block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:opacity-95"
+            title="Preview"
+          >
+            <img src={u} alt={`car-${idx}`} className="h-36 w-full object-cover" loading="lazy" />
+          </button>
+        ))}
+      </div>
+
+      {/* ✅ Lightbox Preview */}
+      {open ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <button className="absolute inset-0 bg-black/70" onClick={close} aria-label="Close preview" />
+
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="text-sm font-extrabold text-slate-900">
+                Preview ({active + 1}/{safe.length})
+              </div>
+              <button onClick={close} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="relative bg-black">
+              <img
+                src={safe[active]}
+                alt={`preview-${active}`}
+                className="h-[70vh] w-full object-contain"
+                loading="eager"
+              />
+
+              {/* Controls */}
+              {safe.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      prev();
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+                    aria-label="Previous"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      next();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+                    aria-label="Next"
+                  >
+                    ›
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-4 py-3">
+              <a
+                href={safe[active]}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-slate-700 underline"
+              >
+                Open in new tab
+              </a>
+
+              {safe.length > 1 ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={prev}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={next}
+                    className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
+
 
 export default function B2BRidesPage() {
   const [tab, setTab] = useState<TabKey>("ongoing");
