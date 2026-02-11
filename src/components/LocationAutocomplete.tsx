@@ -1,5 +1,5 @@
 // src/components/LocationAutocomplete.tsx
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { geoAutocomplete, type OlaSuggestion } from "../lib/geoApi";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
