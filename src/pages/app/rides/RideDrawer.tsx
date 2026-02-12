@@ -7,7 +7,6 @@ import {
   XCircle,
   UserPlus,
   AlertTriangle,
-  MapPin,
   Car,
   Clock,
   IndianRupee,
@@ -778,39 +777,65 @@ const assignedAt =
               ) : null}
 
               {/* Route + status */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                      <MapPin size={18} />
-                      <span className="truncate">
-                        {r.pickup_location} → {r.drop_location}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">Status: {r.ride_status}</div>
-                  </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+  {/* Header: Status + Fare */}
+  <div className="flex items-start justify-between gap-3">
+    <div>
+      <div className="text-xs font-semibold text-slate-500">Status</div>
+      <div className="mt-1">
+        <Badge tone="slate">{r.ride_status || "—"}</Badge>
+      </div>
+    </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    <Badge tone="slate">{r.ride_status}</Badge>
-                    <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                      <IndianRupee size={16} />
-                      {money(r.fare_estimation || r.total_fare || 0)}
-                    </div>
-                  </div>
-                </div>
+    <div className="text-right">
+      <div className="text-xs font-semibold text-slate-500">Fare</div>
+      <div className="mt-1 text-lg font-extrabold text-slate-900 flex items-center justify-end gap-2">
+        <IndianRupee size={16} />
+        {money(r.fare_estimation || r.total_fare || 0)}
+      </div>
+    </div>
+  </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {flags.length === 0 ? (
-                    <span className="text-xs text-slate-500">No flags</span>
-                  ) : (
-                    flags.map((f) => (
-                      <Badge key={f.key} tone={f.tone}>
-                        {f.label}
-                      </Badge>
-                    ))
-                  )}
-                </div>
-              </div>
+  {/* Pickup */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="flex items-start gap-3">
+      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-green-600" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-extrabold text-slate-500">PICKUP</div>
+        <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
+          {r.pickup_location || "—"}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Drop */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="flex items-start gap-3">
+      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-600" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-extrabold text-slate-500">DROP</div>
+        <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
+          {r.drop_location || "—"}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Flags */}
+  <div className="flex flex-wrap gap-2">
+    {flags.length === 0 ? (
+      <span className="text-xs text-slate-500">No flags</span>
+    ) : (
+      flags.map((f) => (
+        <Badge key={f.key} tone={f.tone}>
+          {f.label}
+        </Badge>
+      ))
+    )}
+  </div>
+</div>
+
 
               {/* Coordinates */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
