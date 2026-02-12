@@ -49,15 +49,11 @@ export async function getInvoice(invoiceId: string): Promise<Invoice> {
 }
 
 /* -------------------- list invoices -------------------- */
-export async function listInvoices(params: {
-  companyId?: string;
-  type?: InvoiceType;
-  month?: number;
-  year?: number;
-}): Promise<Invoice[]> {
-  const { data } = await api.get(`/invoices`, { params });
-  return data.invoices;
+export async function listInvoices(params?: any) {
+  const { data } = await api.get("/invoices", { params });
+  return data?.invoices || [];
 }
+
 
 /* -------------------- generate monthly -------------------- */
 export async function generateMonthlyInvoice(payload: {

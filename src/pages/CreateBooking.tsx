@@ -525,7 +525,7 @@ export default function CreateBooking() {
                       className={inputCls + " mt-2"}
                       value={form.car_type}
                       onChange={(e) => setForm({ ...form, car_type: e.target.value })}
-                      placeholder="Sedan / Hatchback"
+                      placeholder="Automatic / Semi-Automatic"
                     />
                   </div>
 
