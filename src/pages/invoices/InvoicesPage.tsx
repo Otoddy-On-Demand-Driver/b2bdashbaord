@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   listInvoices,
   generateMonthlyInvoice,
+  generatePeriodInvoice, // ✅ add
   openInvoicePdf,
   INVOICE_TYPES,
   INVOICE_STATUSES,
@@ -16,11 +17,18 @@ import { apiErrorMessage } from "../../lib/api";
 const inr = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
 
-// Allow "All Months"
 const MONTHS: Array<{ label: string; value: number | "" }> = [
   { label: "All Months", value: "" },
   ...Array.from({ length: 12 }).map((_, i) => ({ label: String(i + 1), value: i + 1 })),
 ];
+
+// yyyy-mm-dd helper for <input type="date" />
+function toDateInputValue(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export default function InvoicesPage() {
   const nav = useNavigate();
@@ -33,17 +41,20 @@ export default function InvoicesPage() {
   const [companyId, setCompanyId] = useState("");
   const [type, setType] = useState<"" | InvoiceType>("");
   const [status, setStatus] = useState<"" | InvoiceStatus>("");
-const [month, setMonth] = useState<number | "">("");
+  const [month, setMonth] = useState<number | "">("");
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [q, setQ] = useState("");
+
+  // ✅ date range for period invoice
+  const today = new Date();
+  const [fromDate, setFromDate] = useState<string>(toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)));
+  const [toDate, setToDate] = useState<string>(toDateInputValue(today));
 
   async function load() {
     try {
       setLoading(true);
       setError("");
 
-      // API supports companyId/type/month/year only
-      // Keep month/year optional (All Months) + avoid forcing month/year for ride invoices by default
       const params: {
         companyId?: string;
         type?: InvoiceType;
@@ -54,9 +65,6 @@ const [month, setMonth] = useState<number | "">("");
         type: (type || undefined) as any,
       };
 
-      // Apply month/year only when:
-      // - month is selected (not "All Months")
-      // - and year is valid
       if (month !== "" && Number.isFinite(year)) {
         params.month = month;
         params.year = year;
@@ -74,23 +82,17 @@ const [month, setMonth] = useState<number | "">("");
 
   async function onGenerateMonthly() {
     try {
-      const cid = companyId.trim();
-      if (!cid) return;
+      const cid = companyId.trim() || undefined;
+const m = month === "" ? new Date().getMonth() + 1 : month;
+const y = Number.isFinite(year) ? year : new Date().getFullYear();
 
-      // Monthly invoice needs a concrete month
-      if (month === "") {
-        setError("Select a month to generate a monthly invoice.");
-        return;
-      }
+const inv = await generateMonthlyInvoice({
+  companyId: cid,   // ✅ optional
+  month: m,
+  year: y,
+});
 
-      setLoading(true);
-      setError("");
 
-      const inv = await generateMonthlyInvoice({
-        companyId: cid,
-        month,
-        year,
-      });
 
       nav(`/invoices/${inv._id}`);
     } catch (e) {
@@ -100,12 +102,44 @@ const [month, setMonth] = useState<number | "">("");
     }
   }
 
+  // ✅ NEW: Generate Period (From-To) single invoice
+  async function onGeneratePeriod() {
+  try {
+    const cid = companyId.trim() || undefined;
+
+    if (!fromDate || !toDate) {
+      setError("Select From date and To date.");
+      return;
+    }
+
+    if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
+      setError("From date must be <= To date.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const inv = await generatePeriodInvoice({
+      companyId: cid,        // ✅ optional
+      startDate: fromDate,
+      endDate: toDate,
+    });
+
+    nav(`/invoices/${inv._id}`);
+  } catch (e) {
+    setError(apiErrorMessage(e));
+  } finally {
+    setLoading(false);
+  }
+}
+
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // client-side filters (status + search)
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (rows || []).filter((inv) => {
@@ -129,13 +163,13 @@ const [month, setMonth] = useState<number | "">("");
     });
   }, [rows, q, status]);
 
-  // summary cards
   const summary = useMemo(() => {
     const total = filtered.reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
     const count = filtered.length;
     const monthlyCount = filtered.filter((x) => x.type === "monthly").length;
     const rideCount = filtered.filter((x) => x.type === "ride").length;
-    return { total, count, monthlyCount, rideCount };
+    const periodCount = filtered.filter((x) => x.type === "period").length; // ✅
+    return { total, count, monthlyCount, rideCount, periodCount };
   }, [filtered]);
 
   return (
@@ -143,10 +177,10 @@ const [month, setMonth] = useState<number | "">("");
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Invoices</h1>
-          <div className="text-sm text-gray-600 mt-1">Filter + monthly invoice + PDF export</div>
+          <div className="text-sm text-gray-600 mt-1">Filter + monthly/period invoice + PDF export</div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
             onClick={load}
@@ -159,15 +193,19 @@ const [month, setMonth] = useState<number | "">("");
             className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
             disabled={!companyId.trim() || loading || month === ""}
             onClick={onGenerateMonthly}
-            title={
-              !companyId.trim()
-                ? "Enter Company ID first"
-                : month === ""
-                  ? "Select a month"
-                  : ""
-            }
+            title={!companyId.trim() ? "Enter Company ID first" : month === "" ? "Select a month" : ""}
           >
             Generate Monthly Invoice
+          </button>
+
+          {/* ✅ NEW */}
+          <button
+            className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
+disabled={loading || !fromDate || !toDate}
+            onClick={onGeneratePeriod}
+            title={!companyId.trim() ? "Enter Company ID first" : ""}
+          >
+            Generate Period Invoice
           </button>
         </div>
       </div>
@@ -181,11 +219,7 @@ const [month, setMonth] = useState<number | "">("");
           onChange={(e) => setCompanyId(e.target.value)}
         />
 
-        <select
-          className="border rounded px-3 py-2"
-          value={type}
-          onChange={(e) => setType(e.target.value as any)}
-        >
+        <select className="border rounded px-3 py-2" value={type} onChange={(e) => setType(e.target.value as any)}>
           <option value="">All Types</option>
           {INVOICE_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -194,11 +228,7 @@ const [month, setMonth] = useState<number | "">("");
           ))}
         </select>
 
-        <select
-          className="border rounded px-3 py-2"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as any)}
-        >
+        <select className="border rounded px-3 py-2" value={status} onChange={(e) => setStatus(e.target.value as any)}>
           <option value="">All Status</option>
           {INVOICE_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -222,20 +252,34 @@ const [month, setMonth] = useState<number | "">("");
           ))}
         </select>
 
+        <input type="number" className="border rounded px-3 py-2" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+      </div>
+
+      {/* ✅ NEW: Period date range UI */}
+      <div className="grid md:grid-cols-6 gap-3 mt-3 border p-3 rounded-xl">
+        <div className="md:col-span-2 text-sm text-gray-700 flex items-center font-medium">Period Invoice (From–To)</div>
+
         <input
-          type="number"
+          type="date"
           className="border rounded px-3 py-2"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
         />
+
+        <input
+          type="date"
+          className="border rounded px-3 py-2"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+        />
+
+        <div className="md:col-span-2 text-xs text-gray-500 flex items-center">
+          Generates one single invoice for selected date range.
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-2 mt-3">
-        <button
-          className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
-          onClick={load}
-          disabled={loading}
-        >
+        <button className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60" onClick={load} disabled={loading}>
           Apply (API)
         </button>
 
@@ -248,7 +292,7 @@ const [month, setMonth] = useState<number | "">("");
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
         <div className="border rounded-xl p-3">
           <div className="text-xs text-gray-500">Invoices</div>
           <div className="text-lg font-semibold">{summary.count}</div>
@@ -260,6 +304,10 @@ const [month, setMonth] = useState<number | "">("");
         <div className="border rounded-xl p-3">
           <div className="text-xs text-gray-500">Monthly Invoices</div>
           <div className="text-lg font-semibold">{summary.monthlyCount}</div>
+        </div>
+        <div className="border rounded-xl p-3">
+          <div className="text-xs text-gray-500">Period Invoices</div>
+          <div className="text-lg font-semibold">{summary.periodCount}</div>
         </div>
         <div className="border rounded-xl p-3">
           <div className="text-xs text-gray-500">Grand Total</div>
@@ -299,21 +347,13 @@ const [month, setMonth] = useState<number | "">("");
                   <td className="p-2">{inv.status}</td>
                   <td className="p-2">{inv.companyId}</td>
                   <td className="p-2">{inr(inv.grandTotal)}</td>
-                  <td className="p-2">
-                    {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}
-                  </td>
+                  <td className="p-2">{inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : "-"}</td>
                   <td className="p-2 text-right">
                     <div className="flex gap-2 justify-end">
-                      <button
-                        className="border px-2 py-1 rounded hover:bg-gray-50"
-                        onClick={() => nav(`/invoices/${inv._id}`)}
-                      >
+                      <button className="border px-2 py-1 rounded hover:bg-gray-50" onClick={() => nav(`/invoices/${inv._id}`)}>
                         Open
                       </button>
-                      <button
-                        className="border px-2 py-1 rounded hover:bg-gray-50"
-                        onClick={() => openInvoicePdf(inv._id)}
-                      >
+                      <button className="border px-2 py-1 rounded hover:bg-gray-50" onClick={() => openInvoicePdf(inv._id)}>
                         PDF
                       </button>
                     </div>
