@@ -194,12 +194,12 @@ function ImageStrip({ urls }: { urls: string[] }) {
 
             {/* Image */}
             <div className="relative bg-black flex items-center justify-center">
-  <img
-    src={safe[active]}
-    alt={`preview-${active}`}
-    className="max-h-[75vh] max-w-[95vw] object-contain"
-  />
-</div>
+              <img
+                src={safe[active]}
+                alt={`preview-${active}`}
+                className="max-h-[75vh] max-w-[95vw] object-contain"
+              />
+            </div>
 
 
             {/* Footer actions */}
@@ -269,6 +269,10 @@ export default function RideDrawer({
   // assign
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState("");
+  // manual assignment
+  const [manualMode, setManualMode] = useState(false);
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
 
   // ✅ ops review
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -346,11 +350,35 @@ export default function RideDrawer({
   }
 
   async function doAssign() {
-    if (!rideId || !selectedDriver) return;
+    if (!rideId) return;
+
+    // validation
+    if (!manualMode && !selectedDriver) return;
+    if (manualMode && (!manualName.trim() || !manualPhone.trim())) return;
+
     setBusy(true);
+    setErr("");
+
     try {
-      await opsAssignDriver(rideId, selectedDriver);
+      if (manualMode) {
+        await opsAssignDriver(rideId, {
+          manualDriver: {
+            name: manualName.trim(),
+            phone: manualPhone.trim(),
+          },
+        });
+      } else {
+        await opsAssignDriver(rideId, {
+          driverId: selectedDriver,
+        });
+      }
+
       setAssignOpen(false);
+      setManualMode(false);
+      setManualName("");
+      setManualPhone("");
+      setSelectedDriver("");
+
       await load();
       onMutated();
     } catch (e: any) {
@@ -359,6 +387,9 @@ export default function RideDrawer({
       setBusy(false);
     }
   }
+
+
+
 
   const canApprove = useMemo(
     () => ride?.ride_status === "waiting for approval",
@@ -377,15 +408,15 @@ export default function RideDrawer({
 
   // ✅ ongoing detection for map
   const isOngoing = useMemo(() => {
-  const s = String(r?.ride_status || "").toLowerCase();
-  return (
-    s === "driver assigned" ||
-    s === "approved" ||
-    s === "driver arrived" ||
-    s === "ongoing" ||
-    s === "car handed over"
-  );
-}, [r?.ride_status]);
+    const s = String(r?.ride_status || "").toLowerCase();
+    return (
+      s === "driver assigned" ||
+      s === "approved" ||
+      s === "driver arrived" ||
+      s === "ongoing" ||
+      s === "car handed over"
+    );
+  }, [r?.ride_status]);
 
 
   // ✅ driver id for filtering socket payloads
@@ -427,50 +458,50 @@ export default function RideDrawer({
     };
   }, [open, rideId, assignedDriverId]);
 
-// ✅ Driver id for GPS polling (matches opsDriverCoordinates().coordinates[].driverId)
-const driverIdForGps = useMemo(() => {
-  const v = r?.AssignedDriver?.driverId || null;
-  return v ? String(v) : null;
-}, [r?.AssignedDriver]);
+  // ✅ Driver id for GPS polling (matches opsDriverCoordinates().coordinates[].driverId)
+  const driverIdForGps = useMemo(() => {
+    const v = r?.AssignedDriver?.driverId || null;
+    return v ? String(v) : null;
+  }, [r?.AssignedDriver]);
 
-// ✅ FRONTEND-ONLY LIVE GPS: poll /ops/drivers/coordinates every 5s
-useEffect(() => {
-  if (!open) return;
+  // ✅ FRONTEND-ONLY LIVE GPS: poll /ops/drivers/coordinates every 5s
+  useEffect(() => {
+    if (!open) return;
 
-  let t: any = null;
+    let t: any = null;
 
-  async function poll() {
-    if (!driverIdForGps) return;
+    async function poll() {
+      if (!driverIdForGps) return;
 
-    try {
-      const resp = await opsDriverCoordinates();
-      const row = (resp.coordinates || []).find(
-        (x) => String(x.driverId) === String(driverIdForGps)
-      );
+      try {
+        const resp = await opsDriverCoordinates();
+        const row = (resp.coordinates || []).find(
+          (x) => String(x.driverId) === String(driverIdForGps)
+        );
 
-      if (
-  row &&
-  typeof row.lat === "number" &&
-  typeof row.lng === "number"
-) {
-  setLiveDriverLoc({
-    lat: row.lat,
-    lng: row.lng,
-  });
-}
+        if (
+          row &&
+          typeof row.lat === "number" &&
+          typeof row.lng === "number"
+        ) {
+          setLiveDriverLoc({
+            lat: row.lat,
+            lng: row.lng,
+          });
+        }
 
-    } catch {
-      // optional: setErr("GPS fetch failed")
+      } catch {
+        // optional: setErr("GPS fetch failed")
+      }
     }
-  }
 
-  poll(); // initial
-  t = setInterval(poll, 5000);
+    poll(); // initial
+    t = setInterval(poll, 5000);
 
-  return () => {
-    if (t) clearInterval(t);
-  };
-}, [open, driverIdForGps]);
+    return () => {
+      if (t) clearInterval(t);
+    };
+  }, [open, driverIdForGps]);
 
 
 
@@ -540,23 +571,28 @@ useEffect(() => {
   const dropLng = r.drop_longitude;
 
   // images
-const startImgs: string[] = Array.isArray(r.start_car_images)
-  ? r.start_car_images
-  : Array.isArray(r.start_car_images_)
-  ? r.start_car_images_
-  : [];
+  const startImgs: string[] = Array.isArray(r.start_car_images)
+    ? r.start_car_images
+    : Array.isArray(r.start_car_images_)
+      ? r.start_car_images_
+      : [];
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
   // assignedAt
-  const assignedAt = r.driver_assigned_at || r.assigned_at || r.driverAssignedAt || null;
+const assignedAt =
+  r.driver_assign_time ||
+  r.driver_assigned_at ||
+  r.assigned_at ||
+  r.driverAssignedAt ||
+  null;
   // meta (enums set at create time)
-const businessFunction = r.businessFunction ?? r.business_function ?? null;
-const tripCategory = r.tripCategory ?? r.trip_category ?? null;
-const businessCategory = r.businessCategory ?? r.business_category ?? null;
+  const businessFunction = r.businessFunction ?? r.business_function ?? null;
+  const tripCategory = r.tripCategory ?? r.trip_category ?? null;
+  const businessCategory = r.businessCategory ?? r.business_category ?? null;
 
-// POC (optional)
-const pickupPOC = r.pickupPOC ?? r.pickup_poc ?? null;
-const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
+  // POC (optional)
+  const pickupPOC = r.pickupPOC ?? r.pickup_poc ?? null;
+  const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
   // flags
   const flags = [
@@ -574,8 +610,8 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
     liveDriverLoc
       ? [liveDriverLoc.lat, liveDriverLoc.lng]
       : isNum(pickupLat) && isNum(pickupLng)
-      ? [pickupLat, pickupLng]
-      : [28.6139, 77.209];
+        ? [pickupLat, pickupLng]
+        : [28.6139, 77.209];
 
   return (
     <div className="fixed inset-0 z-50">
@@ -588,7 +624,7 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
           {isOngoing ? (
             <>
               <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }}>
-                  <Recenter center={mapCenter} />
+                <Recenter center={mapCenter} />
                 <TileLayer
                   attribution="&copy; OpenStreetMap contributors"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -618,14 +654,14 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
                     positions={
                       liveDriverLoc
                         ? [
-                            [pickupLat, pickupLng],
-                            [liveDriverLoc.lat, liveDriverLoc.lng],
-                            [dropLat, dropLng],
-                          ]
+                          [pickupLat, pickupLng],
+                          [liveDriverLoc.lat, liveDriverLoc.lng],
+                          [dropLat, dropLng],
+                        ]
                         : [
-                            [pickupLat, pickupLng],
-                            [dropLat, dropLng],
-                          ]
+                          [pickupLat, pickupLng],
+                          [dropLat, dropLng],
+                        ]
                     }
                   />
                 ) : null}
@@ -786,25 +822,25 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
                   <Field label="Ride Description" value={r.RideDescription || "—"} />
                 </div>
               </div>
-   
-{/* Booking Meta (Create-time enums + optional fields) */}
-<div className="rounded-3xl border border-slate-200 bg-white p-4">
-  <div className="text-sm font-extrabold text-slate-900">Booking Meta</div>
 
-  <div className="mt-3 grid grid-cols-2 gap-3">
-    <Field label="Business Function" value={businessFunction || "—"} />
-    <Field label="Trip Category" value={tripCategory || "—"} />
-    <Field label="Business Category" value={businessCategory || "—"} />
-    <Field label="Scheduled Time" value={fmtDate(r.scheduled_time)} />
-  </div>
+              {/* Booking Meta (Create-time enums + optional fields) */}
+              <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-extrabold text-slate-900">Booking Meta</div>
 
-  <div className="mt-3 grid grid-cols-2 gap-3">
-    <Field label="Pickup POC Name" value={pickupPOC?.name || "—"} />
-    <Field label="Pickup POC Phone" value={pickupPOC?.phone || "—"} />
-    <Field label="Drop POC Name" value={dropPOC?.name || "—"} />
-    <Field label="Drop POC Phone" value={dropPOC?.phone || "—"} />
-  </div>
-</div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Field label="Business Function" value={businessFunction || "—"} />
+                  <Field label="Trip Category" value={tripCategory || "—"} />
+                  <Field label="Business Category" value={businessCategory || "—"} />
+                  <Field label="Scheduled Time" value={fmtDate(r.scheduled_time)} />
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Field label="Pickup POC Name" value={pickupPOC?.name || "—"} />
+                  <Field label="Pickup POC Phone" value={pickupPOC?.phone || "—"} />
+                  <Field label="Drop POC Name" value={dropPOC?.name || "—"} />
+                  <Field label="Drop POC Phone" value={dropPOC?.phone || "—"} />
+                </div>
+              </div>
 
 
               {/* Time  */}
@@ -1004,23 +1040,56 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
               {/* Assign modal */}
               {assignOpen ? (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
                   <button className="absolute inset-0 bg-black/30" onClick={() => setAssignOpen(false)} />
                   <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
                     <div className="text-sm font-extrabold text-slate-900">Assign Driver</div>
 
-                    <select
-                      value={selectedDriver}
-                      onChange={(e) => setSelectedDriver(e.target.value)}
-                      className="mt-4 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                    >
-                      <option value="">Select driver</option>
-                      {drivers.map((d: any) => (
-                        <option key={d._id} value={d._id}>
-                          {d.name} • {d.phoneNumber || d.phone || "—"}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="text-xs font-semibold text-slate-600">
+                        Mode
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setManualMode(!manualMode)}
+                        className="text-xs font-semibold text-slate-900 underline"
+                      >
+                        {manualMode ? "Use Registered Driver" : "Use Manual Entry"}
+                      </button>
+                    </div>
+
+                    {!manualMode ? (
+                      <select
+                        value={selectedDriver}
+                        onChange={(e) => setSelectedDriver(e.target.value)}
+                        className="mt-3 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                      >
+                        <option value="">Select driver</option>
+                        {drivers.map((d: any) => (
+                          <option key={d._id} value={d._id}>
+                            {d.name} • {d.phoneNumber || "—"}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        <input
+                          value={manualName}
+                          onChange={(e) => setManualName(e.target.value)}
+                          placeholder="Driver Name"
+                          className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+
+                        <input
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                          placeholder="Phone Number"
+                          className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </div>
+                    )}
+
 
                     <div className="mt-4 flex gap-2">
                       <button
@@ -1030,8 +1099,13 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
                         Close
                       </button>
                       <button
-                        disabled={!selectedDriver || busy}
+                        disabled={
+                          busy ||
+                          (!manualMode && !selectedDriver) ||
+                          (manualMode && (!manualName.trim() || !manualPhone.trim()))
+                        }
                         onClick={doAssign}
+
                         className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                       >
                         Assign
@@ -1043,7 +1117,7 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
               {/* Ops Review modal */}
               {reviewOpen ? (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
                   <button className="absolute inset-0 bg-black/30" onClick={() => setReviewOpen(false)} />
                   <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
                     <div className="flex items-center justify-between">
@@ -1095,7 +1169,7 @@ const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
               {/* Emergency update modal */}
               {emergencyOpen ? (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
                   <button className="absolute inset-0 bg-black/30" onClick={() => setEmergencyOpen(false)} />
                   <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
                     <div className="flex items-center justify-between">

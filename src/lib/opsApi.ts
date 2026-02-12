@@ -20,6 +20,7 @@ export type Ride = {
   drop_latitude: number;
   drop_longitude: number;
   scheduled_time?: string | null;
+  assignmentType?: "registered" | "manual";
 
   ride_status: RideStatus;
 
@@ -30,17 +31,20 @@ export type Ride = {
 
   car_details?: { car_no: string; car_type: string; car_model: string; isInsurance: boolean };
 
-  AssignedDriver?: {
-    driverId?: string;
-    name?: string;
-    profilepicture?: string;
-    number?: string;
-  };
+ AssignedDriver?: {
+  driverId?: string | null;
+  name?: string | null;
+  profilepicture?: string | null;
+  number?: string | null;
+};
+
+
+
  isEmergency?: boolean;
   EmergencyDescription?: string;
 
   // ✅ new timestamps for duration calculations
-  driver_assigned_at?: string | null;
+driver_assign_time?: string | null;
   driver_arrival_time?: string | null;
   start_ride_time?: string | null;
   end_ride_time?: string | null;
@@ -175,8 +179,17 @@ export async function opsCancelRide(rideId: string) {
   return data as { ok: boolean; ride: Ride; message?: string };
 }
 
-export async function opsAssignDriver(rideId: string, driverId: string) {
-  const { data } = await api.post(`/ops/rides/${rideId}/assign-driver`, { driverId });
+export async function opsAssignDriver(
+  rideId: string,
+  payload:
+    | { driverId: string }
+    | { manualDriver: { name: string; phone: string } }
+) {
+  const { data } = await api.post(
+    `/ops/rides/${rideId}/assign-driver`,
+    payload
+  );
+
   return data as { ok: boolean; ride: Ride; message?: string };
 }
 
