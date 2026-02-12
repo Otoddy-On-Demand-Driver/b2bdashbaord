@@ -88,6 +88,27 @@ function diffHrsMin(a: any, b: any) {
   return `${sign}${h}h ${m}m`;
 }
 
+function diffMinusMinutes(a: any, b: any, minusMinutes: number) {
+  const da = a ? new Date(a).getTime() : NaN;
+  const db = b ? new Date(b).getTime() : NaN;
+
+  if (!Number.isFinite(da) || !Number.isFinite(db)) return "—";
+
+  let mins = Math.round((da - db) / 60000) - minusMinutes;
+  if (!Number.isFinite(mins)) return "—";
+
+  const sign = mins < 0 ? "-" : "";
+  mins = Math.abs(mins);
+
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+
+  return `${sign}${h}h ${m}m`;
+}
+
+
+
+
 /* ----------------------------- UI bits ----------------------------- */
 function Badge({
   tone = "slate",
@@ -859,9 +880,21 @@ const assignedAt =
 
                   <Field label="Start → End" value={diffHrsMin(r.end_ride_time, r.start_ride_time)} />
                   <Field label="Assign → End" value={diffHrsMin(r.end_ride_time, assignedAt)} />
+                  <Field label="Arrived → Start" value={diffHrsMin(r.start_ride_time,r.driver_arrival_time)}/>
+                   <Field label="Arrived → End" value={diffHrsMin(r.end_ride_time, r.driver_arrival_time)} />
 
-                  <Field label="End → Handover" value={diffHrsMin(r.car_handover_time, r.end_ride_time)} />
-                  <Field label="Assign → Handover" value={diffHrsMin(r.car_handover_time, assignedAt)} />
+  {/* ✅ NEW 2 */}
+  <Field
+    label="Start → End (Minus 90 mins)"
+    value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)}
+  />
+
+  {/* ✅ NEW 3 */}
+  <Field
+    label="Estimated → Actual Arrival"
+    value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)}
+  />
+             
                 </div>
               </div>
 
