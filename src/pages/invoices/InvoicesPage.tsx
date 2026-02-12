@@ -33,7 +33,7 @@ export default function InvoicesPage() {
   const [companyId, setCompanyId] = useState("");
   const [type, setType] = useState<"" | InvoiceType>("");
   const [status, setStatus] = useState<"" | InvoiceStatus>("");
-  const [month, setMonth] = useState<number | "">(new Date().getMonth() + 1); // default current month
+const [month, setMonth] = useState<number | "">("");
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [q, setQ] = useState("");
 
