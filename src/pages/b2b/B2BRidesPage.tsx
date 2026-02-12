@@ -666,6 +666,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Field label="Created" value={fmtDate((ride as any).createdAt)} />
                 <Field label="Scheduled" value={fmtDate((ride as any).scheduled_time)} />
+                <Field label="Driver Assigned At" value={fmtDate((ride as any).driver_assign_time)} />
                 <Field label="Driver arrival" value={fmtDate((ride as any).driver_arrival_time)} />
                 <Field label="Start ride" value={fmtDate((ride as any).start_ride_time)} />
                 <Field label="End ride" value={fmtDate((ride as any).end_ride_time)} />
