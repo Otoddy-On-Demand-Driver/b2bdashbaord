@@ -249,11 +249,28 @@ export type Withdrawal = {
     name?: string;
     phoneNumber?: string;
     email?: string;
+    walletBalance?: number;
+    bankDetails?: {
+      ifsc?: string;
+      accountNumber?: string;
+      bankName?: string;
+    };
   };
   amount: number;
   status: "pending" | "approved" | "rejected";
   createdAt: string;
+  updatedAt?: string;
 };
+
+export async function opsApproveWithdrawal(withdrawalId: string) {
+  const { data } = await api.patch(`/ops/withdrawals/${withdrawalId}/approve`, {});
+  return data as { ok: boolean; message?: string; withdrawal: Withdrawal; driverWalletBalance?: number };
+}
+
+export async function opsRejectWithdrawal(withdrawalId: string, reason?: string) {
+  const { data } = await api.patch(`/ops/withdrawals/${withdrawalId}/reject`, { reason });
+  return data as { ok: boolean; message?: string; withdrawal: Withdrawal; reason?: string };
+}
 
 export async function opsGetWithdrawals() {
   const { data } = await api.get("/ops/withdrawals");

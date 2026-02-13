@@ -1,7 +1,6 @@
 // src/lib/geoApi.ts
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
-console.log("ENV BASE:", API_BASE);  // 👈 yahin add karo
 export type OlaSuggestion = {
   label: string;
   place_id: string | null;
