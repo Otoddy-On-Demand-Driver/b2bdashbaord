@@ -269,3 +269,21 @@ export async function opsEarningsByDate(date: string) {
     date: string;
   };
 }
+
+
+
+// ✅ Update ride times (Assign/Arrive/Start/End/Handover)
+export async function opsUpdateRideTimes(
+  rideId: string,
+  payload: Partial<{
+    driver_assign_time: string | null;
+    driver_arrival_time: string | null;
+    start_ride_time: string | null;
+    end_ride_time: string | null;
+    car_handover_time: string | null;
+    scheduled_time: string | null; // optional
+  }>
+) {
+  const { data } = await api.patch(`/ops/rides/${rideId}/times`, payload);
+  return data as { ok: boolean; ride: Ride; message?: string };
+}
