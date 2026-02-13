@@ -178,10 +178,13 @@ export async function opsGetRide(rideId: string) {
   return data as { ok: boolean; ride: Ride };
 }
 
-export async function opsApproveRide(rideId: string) {
-  const { data } = await api.post(`/ops/rides/${rideId}/approve`, {});
+export async function opsApproveRide(rideId: string, insentive_amount?: number) {
+  const { data } = await api.post(`/ops/rides/${rideId}/approve`, {
+    ...(insentive_amount !== undefined ? { insentive_amount } : {}),
+  });
   return data as { ok: boolean; ride: Ride; message?: string };
 }
+
 
 export async function opsCancelRide(rideId: string) {
   const { data } = await api.post(`/ops/rides/${rideId}/cancel`, {});
@@ -304,3 +307,6 @@ export async function opsUpdateRideTimes(
   const { data } = await api.patch(`/ops/rides/${rideId}/times`, payload);
   return data as { ok: boolean; ride: Ride; message?: string };
 }
+
+
+
