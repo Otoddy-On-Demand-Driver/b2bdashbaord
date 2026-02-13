@@ -296,22 +296,22 @@ export default function CreateBooking() {
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-  <LocationAutocomplete
-    label="Pickup Location"
-    labelClassName={labelCls}
-    inputClassName={inputCls + " mt-2"}
-    value={form.pickup_location}
-    onChangeText={(text) => setForm({ ...form, pickup_location: text })}
-    onSelect={(s: OlaSuggestion) =>
-      setForm((prev) => ({
-        ...prev,
-        pickup_location: s.label,
-        pickup_latitude: String(s.lat),
-        pickup_longitude: String(s.lng),
-      }))
-    }
-  />
-</div>
+                  <LocationAutocomplete
+                    label="Pickup Location"
+                    labelClassName={labelCls}
+                    inputClassName={inputCls + " mt-2"}
+                    value={form.pickup_location}
+                    onChangeText={(text) => setForm({ ...form, pickup_location: text })}
+                    onSelect={(s: OlaSuggestion) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        pickup_location: s.label,
+                        pickup_latitude: String(s.lat),
+                        pickup_longitude: String(s.lng),
+                      }))
+                    }
+                  />
+                </div>
 
 
                 <div>
@@ -374,24 +374,24 @@ export default function CreateBooking() {
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-  <LocationAutocomplete
-    label="Drop Location"
-    labelClassName={labelCls}
-    inputClassName={inputCls + " mt-2"}
-    value={form.drop_location}
-    onChangeText={(text) => setForm({ ...form, drop_location: text })}
-    biasLocation={pickupBias}   // optional but recommended
-    radius={25000}              // optional
-    onSelect={(s: OlaSuggestion) =>
-      setForm((prev) => ({
-        ...prev,
-        drop_location: s.label,
-        drop_latitude: String(s.lat),
-        drop_longitude: String(s.lng),
-      }))
-    }
-  />
-</div>
+                  <LocationAutocomplete
+                    label="Drop Location"
+                    labelClassName={labelCls}
+                    inputClassName={inputCls + " mt-2"}
+                    value={form.drop_location}
+                    onChangeText={(text) => setForm({ ...form, drop_location: text })}
+                    biasLocation={pickupBias}   // optional but recommended
+                    radius={25000}              // optional
+                    onSelect={(s: OlaSuggestion) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        drop_location: s.label,
+                        drop_latitude: String(s.lat),
+                        drop_longitude: String(s.lng),
+                      }))
+                    }
+                  />
+                </div>
 
 
                 <div>
@@ -520,35 +520,41 @@ export default function CreateBooking() {
                   </div>
 
                   <div>
-                    <div className={labelCls}>Car Type</div>
-                    <input
-                      className={inputCls + " mt-2"}
-                      value={form.car_type}
-                      onChange={(e) => setForm({ ...form, car_type: e.target.value })}
-                      placeholder="Automatic / Semi-Automatic"
-                    />
-                  </div>
+                      <div className={labelCls}>Car Type</div>
 
-                  <div className="md:col-span-2">
-                    <div className={labelCls}>Car Model</div>
-                    <input
-                      className={inputCls + " mt-2"}
-                      value={form.car_model}
-                      onChange={(e) => setForm({ ...form, car_model: e.target.value })}
-                      placeholder="Swift / City / Verna"
-                    />
-                  </div>
+                      <select
+                        className={inputCls + " mt-2"}
+                        value={form.car_type}
+                        onChange={(e) => setForm({ ...form, car_type: e.target.value })}
+                      >
+                        <option value="">Select Car Type</option>
+                        <option value="Automatic">Automatic</option>
+                        <option value="Semi-Automatic">Semi Automatic</option>
+                        <option value="Manual">Manual</option>
+                      </select>
+                    </div>
 
-                  <label className="md:col-span-2 flex items-center gap-3 mt-1 select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.isInsurance}
-                      onChange={(e) => setForm({ ...form, isInsurance: e.target.checked })}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm text-black/70">Insurance Available</span>
-                  </label>
-                </div>
+
+                    <div className="md:col-span-2">
+                      <div className={labelCls}>Car Model</div>
+                      <input
+                        className={inputCls + " mt-2"}
+                        value={form.car_model}
+                        onChange={(e) => setForm({ ...form, car_model: e.target.value })}
+                        placeholder="Swift / City / Verna"
+                      />
+                    </div>
+
+                    <label className="md:col-span-2 flex items-center gap-3 mt-1 select-none">
+                      <input
+                        type="checkbox"
+                        checked={form.isInsurance}
+                        onChange={(e) => setForm({ ...form, isInsurance: e.target.checked })}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-black/70">Insurance Available</span>
+                    </label>
+                  </div>
               </section>
             )}
 

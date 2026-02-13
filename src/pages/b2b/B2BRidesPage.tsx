@@ -45,14 +45,18 @@ function safeNum(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+ 
 /* ----------------------------- Leaflet marker fix ----------------------------- */
 const pinIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "/logo.png",
+  iconRetinaUrl: "/logo.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [45, 45],     // adjust size if needed
+  iconAnchor: [22, 45],   // bottom center
+  popupAnchor: [0, -45],
 });
+
+
 
 /* ----------------------------- Images helpers (NEW) ----------------------------- */
 function normalizeUrls(v: any): string[] {

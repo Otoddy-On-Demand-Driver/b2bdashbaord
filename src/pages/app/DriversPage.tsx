@@ -6,7 +6,8 @@ import {
   opsGetPendingDrivers,
   opsApproveDriverVerification,
   opsRejectDriverVerification,
-  opsSearchDrivers, // keep if you already have it
+  opsSearchDrivers,
+  opsSetDriverAvailability,
 } from "../../lib/opsApi";
 import { apiErrorMessage } from "../../lib/api";
 import DriverDrawer from "./drivers/DriverDrawer";
@@ -33,7 +34,9 @@ function Chip({
       : "bg-slate-50 text-slate-700 border-slate-200";
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${cls}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${cls}`}
+    >
       {children}
     </span>
   );
@@ -51,7 +54,13 @@ export default function DriversPage() {
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
     | null
-    | { type: "approve" | "reject"; driverId: string; name: string; phone?: string; reason?: string }
+    | {
+        type: "approve" | "reject";
+        driverId: string;
+        name: string;
+        phone?: string;
+        reason?: string;
+      }
   >(null);
 
   async function load(tabOverride?: TabKey) {
@@ -89,8 +98,12 @@ export default function DriversPage() {
       const status = payload?.status || payload?.currentStatus;
       if (!driverId) return;
 
-      setRows((prev) =>
-        prev.map((d) => (String((d as any)._id) === driverId ? ({ ...d, currentStatus: status } as any) : d))
+      setRows((prev: any) =>
+        prev.map((d: any) =>
+          String(d._id) === driverId
+            ? ({ ...d, currentStatus: status, status } as any)
+            : d
+        )
       );
     }
 
@@ -132,9 +145,15 @@ export default function DriversPage() {
     }
   }
 
-  const pendingVerification = useMemo(() => rows.filter((d: any) => !d.isApproved), [rows]);
+  const pendingVerification = useMemo(
+    () => rows.filter((d: any) => !d.isApproved),
+    [rows]
+  );
 
-  const approvedDrivers = useMemo(() => rows.filter((d: any) => !!d.isApproved), [rows]);
+  const approvedDrivers = useMemo(
+    () => rows.filter((d: any) => !!d.isApproved),
+    [rows]
+  );
 
   const list = useMemo(() => {
     // If tab is verification, backend already returned pending list; but safe fallback:
@@ -142,10 +161,21 @@ export default function DriversPage() {
   }, [rows, pendingVerification, tab]);
 
   function openApprove(d: any) {
-    setConfirm({ type: "approve", driverId: String(d._id), name: d.name, phone: d.phoneNumber });
+    setConfirm({
+      type: "approve",
+      driverId: String(d._id),
+      name: d.name,
+      phone: d.phoneNumber,
+    });
   }
   function openReject(d: any) {
-    setConfirm({ type: "reject", driverId: String(d._id), name: d.name, phone: d.phoneNumber });
+    setConfirm({
+      type: "reject",
+      driverId: String(d._id),
+      name: d.name,
+      phone: d.phoneNumber,
+      reason: "",
+    });
   }
 
   async function runConfirmAction() {
@@ -162,10 +192,15 @@ export default function DriversPage() {
         await opsRejectDriverVerification(driverId, confirm.reason);
       }
 
-      // ✅ IMPORTANT: refresh from DB so it persists after page revisit
+      // ✅ refresh from DB so it persists after page revisit
       await load(tab);
     } catch (e: any) {
-      setErr(apiErrorMessage(e, type === "approve" ? "Approve failed" : "Reject failed"));
+      setErr(
+        apiErrorMessage(
+          e,
+          type === "approve" ? "Approve failed" : "Reject failed"
+        )
+      );
       await load(tab);
     } finally {
       setActionBusyId(null);
@@ -173,14 +208,44 @@ export default function DriversPage() {
     }
   }
 
+  async function setAvailability(driverId: string, status: "online" | "offline") {
+    setErr("");
+    setActionBusyId(driverId);
+
+    try {
+      await opsSetDriverAvailability(driverId, status);
+
+      // ✅ update UI immediately
+      setRows((prev: any) =>
+        prev.map((d: any) =>
+          String(d._id) === String(driverId)
+            ? ({ ...d, currentStatus: status, status } as any)
+            : d
+        )
+      );
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Failed to update availability"));
+    } finally {
+      setActionBusyId(null);
+    }
+  }
+
+  const onlineNowCount = useMemo(() => {
+    return rows.filter((d: any) => (d.currentStatus || d.status) === "online")
+      .length;
+  }, [rows]);
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Drivers</h1>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
+            Drivers
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Verification queue and driver management. Approve new registrations before they can use the app.
+            Verification queue and driver management. Approve new registrations
+            before they can use the app.
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
@@ -213,7 +278,9 @@ export default function DriversPage() {
           Verification Queue
           <span
             className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
-              tab === "verification" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
+              tab === "verification"
+                ? "bg-white/15 text-white"
+                : "bg-slate-100 text-slate-700"
             }`}
           >
             {pendingVerification.length}
@@ -231,7 +298,9 @@ export default function DriversPage() {
           All Drivers
           <span
             className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${
-              tab === "all" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
+              tab === "all"
+                ? "bg-white/15 text-white"
+                : "bg-slate-100 text-slate-700"
             }`}
           >
             {rows.length}
@@ -257,21 +326,35 @@ export default function DriversPage() {
       {/* Summary cards */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-semibold text-slate-500">Pending Verification</div>
-          <div className="mt-1 text-2xl font-extrabold text-slate-900">{pendingVerification.length}</div>
-          <div className="mt-1 text-xs text-slate-600">Approve these drivers to allow app login.</div>
+          <div className="text-xs font-semibold text-slate-500">
+            Pending Verification
+          </div>
+          <div className="mt-1 text-2xl font-extrabold text-slate-900">
+            {pendingVerification.length}
+          </div>
+          <div className="mt-1 text-xs text-slate-600">
+            Approve these drivers to allow app login.
+          </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
           <div className="text-xs font-semibold text-slate-500">Approved</div>
-          <div className="mt-1 text-2xl font-extrabold text-slate-900">{approvedDrivers.length}</div>
-          <div className="mt-1 text-xs text-slate-600">Active drivers (eligible for access).</div>
+          <div className="mt-1 text-2xl font-extrabold text-slate-900">
+            {approvedDrivers.length}
+          </div>
+          <div className="mt-1 text-xs text-slate-600">
+            Active drivers (eligible for access).
+          </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-semibold text-slate-500">Online Right Now</div>
-          <div className="mt-1 text-2xl font-extrabold text-slate-900">
-            {rows.filter((d: any) => d.currentStatus === "online").length}
+          <div className="text-xs font-semibold text-slate-500">
+            Online Right Now
           </div>
-          <div className="mt-1 text-xs text-slate-600">Live status from socket events.</div>
+          <div className="mt-1 text-2xl font-extrabold text-slate-900">
+            {onlineNowCount}
+          </div>
+          <div className="mt-1 text-xs text-slate-600">
+            Live status from socket events.
+          </div>
         </div>
       </div>
 
@@ -288,7 +371,9 @@ export default function DriversPage() {
           <div className="col-span-2">Online</div>
           <div className="col-span-2">Verified</div>
           <div className="col-span-2">Approval</div>
-          <div className="col-span-2 text-right">{tab === "verification" ? "Verification" : "Action"}</div>
+          <div className="col-span-2 text-right">
+            {tab === "verification" ? "Verification" : "Action"}
+          </div>
         </div>
 
         {loading ? (
@@ -299,7 +384,9 @@ export default function DriversPage() {
           </div>
         ) : (
           list.map((d: any) => {
-            const onlineTone = d.currentStatus === "online" ? "green" : "slate";
+            const liveStatus = d.currentStatus || d.status || "offline";
+
+            const onlineTone = liveStatus === "online" ? "green" : "slate";
             const verifiedTone = d.isVerified ? "green" : "amber";
             const approvalTone = d.isApproved ? "green" : "amber";
 
@@ -312,22 +399,37 @@ export default function DriversPage() {
               >
                 <div className="col-span-4">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-slate-900">{d.name}</div>
-                    {!d.isApproved ? <Chip tone="amber">Pending</Chip> : <Chip tone="green">Approved</Chip>}
+                    <div className="text-sm font-semibold text-slate-900">
+                      {d.name}
+                    </div>
+                    {!d.isApproved ? (
+                      <Chip tone="amber">Pending</Chip>
+                    ) : (
+                      <Chip tone="green">Approved</Chip>
+                    )}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{d.phoneNumber}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {d.phoneNumber}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {d.email || "—"}
+                  </div>
                 </div>
 
                 <div className="col-span-2 text-sm text-slate-700">
-                  <Chip tone={onlineTone as any}>{d.currentStatus || "offline"}</Chip>
+                  <Chip tone={onlineTone as any}>{liveStatus}</Chip>
                 </div>
 
                 <div className="col-span-2 text-sm text-slate-700">
-                  <Chip tone={verifiedTone as any}>{d.isVerified ? "Verified" : "Not verified"}</Chip>
+                  <Chip tone={verifiedTone as any}>
+                    {d.isVerified ? "Verified" : "Not verified"}
+                  </Chip>
                 </div>
 
                 <div className="col-span-2 text-sm text-slate-700">
-                  <Chip tone={approvalTone as any}>{d.isApproved ? "Approved" : "Needs approval"}</Chip>
+                  <Chip tone={approvalTone as any}>
+                    {d.isApproved ? "Approved" : "Needs approval"}
+                  </Chip>
                 </div>
 
                 <div className="col-span-2 flex justify-end gap-2">
@@ -349,12 +451,39 @@ export default function DriversPage() {
                       </button>
                     </>
                   ) : (
-                    <button
-                      onClick={() => setActiveId(String(d._id))}
-                      className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                    >
-                      View
-                    </button>
+                    <>
+                      <button
+                        disabled={busy}
+                        onClick={() => setActiveId(String(d._id))}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        View
+                      </button>
+
+                      <button
+                        disabled={busy || liveStatus === "online"}
+                        onClick={() =>
+                          setAvailability(String(d._id), "online")
+                        }
+                        className="rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {busy && actionBusyId === String(d._id)
+                          ? "..."
+                          : "Online"}
+                      </button>
+
+                      <button
+                        disabled={busy || liveStatus === "offline"}
+                        onClick={() =>
+                          setAvailability(String(d._id), "offline")
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {busy && actionBusyId === String(d._id)
+                          ? "..."
+                          : "Offline"}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -364,16 +493,26 @@ export default function DriversPage() {
       </div>
 
       {/* Drawer */}
-      <DriverDrawer open={!!activeId} driverId={activeId} onClose={() => setActiveId(null)} onMutated={() => load(tab)} />
+      <DriverDrawer
+        open={!!activeId}
+        driverId={activeId}
+        onClose={() => setActiveId(null)}
+        onMutated={() => load(tab)}
+      />
 
       {/* Confirm Modal */}
       {confirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirm(null)} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setConfirm(null)}
+          />
           <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-xl">
             <div className="p-5 border-b border-slate-200">
               <div className="text-sm font-extrabold text-slate-900">
-                {confirm.type === "approve" ? "Approve driver?" : "Reject driver?"}
+                {confirm.type === "approve"
+                  ? "Approve driver?"
+                  : "Reject driver?"}
               </div>
               <div className="mt-1 text-xs text-slate-600">
                 {confirm.name} {confirm.phone ? `• ${confirm.phone}` : ""}
@@ -383,16 +522,20 @@ export default function DriversPage() {
             <div className="p-5">
               {confirm.type === "approve" ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  After approval, this driver will be marked <b>Approved</b> in DB.
+                  After approval, this driver will be marked <b>Approved</b> in
+                  DB.
                 </div>
               ) : (
                 <>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                    Rejected driver will be <b>deleted</b> (as per backend controller).
+                    Rejected driver will be <b>deleted</b> (as per backend
+                    controller).
                   </div>
                   <textarea
                     value={confirm.reason || ""}
-                    onChange={(e) => setConfirm((p) => (p ? { ...p, reason: e.target.value } : p))}
+                    onChange={(e) =>
+                      setConfirm((p) => (p ? { ...p, reason: e.target.value } : p))
+                    }
                     placeholder="Reason (optional)"
                     className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
                     rows={3}

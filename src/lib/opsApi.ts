@@ -163,6 +163,15 @@ export async function opsRejectDriverVerification(driverId: string, reason?: str
   const { data } = await api.post(`/ops/drivers/${driverId}/reject`, { reason });
   return data as { ok: boolean; message: string; reason?: string };
 }
+// src/lib/opsApi.ts
+export async function opsSetDriverAvailability(
+  driverId: string,
+  status: "online" | "offline"
+) {
+  const res = await api.post(`/ops/drivers/${driverId}/availability`, { status });
+  return res.data;
+}
+
 
 export async function opsGetRide(rideId: string) {
   const { data } = await api.get(`/ops/rides/${rideId}`);
