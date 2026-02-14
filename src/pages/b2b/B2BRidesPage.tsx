@@ -45,17 +45,20 @@ function safeNum(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+ 
 /* ----------------------------- Leaflet marker fix ----------------------------- */
 const pinIcon = new L.Icon({
   iconUrl: "/logo.png",
   iconRetinaUrl: "/logo.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [45, 45],
-  iconAnchor: [22, 45],
+  iconSize: [45, 45],     // adjust size if needed
+  iconAnchor: [22, 45],   // bottom center
   popupAnchor: [0, -45],
 });
 
-/* ----------------------------- Images helpers ----------------------------- */
+
+
+/* ----------------------------- Images helpers (NEW) ----------------------------- */
 function normalizeUrls(v: any): string[] {
   if (!v) return [];
   if (Array.isArray(v)) return v.filter(Boolean).map(String);
@@ -192,15 +195,13 @@ function ImageGrid({ urls }: { urls: string[] }) {
   );
 }
 
+
 export default function B2BRidesPage() {
   const [tab, setTab] = useState<TabKey>("ongoing");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [rides, setRides] = useState<Ride[]>([]);
   const [openRideId, setOpenRideId] = useState<string | null>(null);
-
-  // ✅ SEARCH (NEW)
-  const [q, setQ] = useState("");
 
   async function load() {
     setErr("");
@@ -229,55 +230,9 @@ export default function B2BRidesPage() {
   }, [tab]);
 
   const selectedRide = useMemo(
-    () => rides.find((r) => String((r as any)._id) === String(openRideId)) || null,
+    () => rides.find((r) => String(r._id) === String(openRideId)) || null,
     [rides, openRideId]
   );
-
-  // ✅ FILTERED RIDES (NEW)
-  const filteredRides = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rides;
-
-    return (rides as any[]).filter((r) => {
-      const hay = [
-        r._id,
-        r.pickup_location,
-        r.drop_location,
-        r.ride_status,
-
-        r.fare_estimation,
-        r.total_fare,
-
-        r.scheduled_time,
-        r.createdAt,
-
-        r.car_details?.car_no,
-        r.car_details?.car_type,
-        r.car_details?.car_model,
-
-        r.AssignedDriver?.name,
-        r.AssignedDriver?.number,
-        r.AssignedDriver?.driverId,
-
-        r.tripCategory,
-        r.businessCategory,
-        r.businessFunction,
-        r.fareModel,
-
-        r.pickupPOC?.name,
-        r.pickupPOC?.phone,
-        r.dropPOC?.name,
-        r.dropPOC?.phone,
-
-        r.isEmergency ? "emergency" : "",
-      ]
-        .filter(Boolean)
-        .map((v) => String(v).toLowerCase())
-        .join(" ");
-
-      return hay.includes(s);
-    });
-  }, [rides, q]);
 
   return (
     <div className="p-6">
@@ -313,19 +268,6 @@ export default function B2BRidesPage() {
         ))}
       </div>
 
-      {/* ✅ Search + count (NEW) */}
-      <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by id, route, status, driver, car no, POC..."
-          className="h-11 w-full md:w-[520px] rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
-        />
-        <div className="md:ml-auto text-sm text-slate-600">
-          <span className="font-semibold text-slate-900">{filteredRides.length}</span> rides
-        </div>
-      </div>
-
       {err ? (
         <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {err}
@@ -343,10 +285,10 @@ export default function B2BRidesPage() {
 
         {loading ? (
           <div className="px-5 py-6 text-sm text-slate-500">Loading…</div>
-        ) : filteredRides.length === 0 ? (
+        ) : rides.length === 0 ? (
           <div className="px-5 py-6 text-sm text-slate-500">No rides.</div>
         ) : (
-          (filteredRides as any[]).map((r) => (
+          rides.map((r) => (
             <button
               key={r._id}
               onClick={() => setOpenRideId(r._id)}
@@ -388,7 +330,9 @@ export default function B2BRidesPage() {
  */
 function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClose: () => void }) {
   const [err, setErr] = useState("");
-  const [driverLoc, setDriverLoc] = useState<{ lat: number | null; lng: number | null } | null>(null);
+  const [driverLoc, setDriverLoc] = useState<{ lat: number | null; lng: number | null } | null>(
+    null
+  );
   const [polling, setPolling] = useState(false);
 
   // ✅ keep latest ride ref for polling closure safety
@@ -499,7 +443,10 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
         {/* LEFT MAP (Desktop) */}
         <div className="hidden md:block flex-1 relative bg-slate-100">
           <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }}>
-            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
             {showPickup ? (
               <Marker icon={pinIcon} position={[pickupLat as number, pickupLng as number]}>
@@ -658,7 +605,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
               </div>
             </div>
 
-            {/* Start/End Ride Images */}
+            {/* ✅ NEW: Start/End Ride Images (uses schema as-is) */}
             <div className="rounded-3xl border border-slate-200 bg-white p-4">
               <div className="text-sm font-extrabold text-slate-900">Car Images</div>
 
