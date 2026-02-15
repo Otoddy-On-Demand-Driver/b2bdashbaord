@@ -310,3 +310,13 @@ export async function opsUpdateRideTimes(
 
 
 
+export async function opsEarningsTotal() {
+  const { data } = await api.get("/ops/earnings/total");
+  return data as {
+    ok: boolean;
+    totalFare: number;
+    totalIncentive?: number;
+    grandTotal?: number;
+    ridesCount: number;
+  };
+}

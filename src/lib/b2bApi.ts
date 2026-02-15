@@ -5,6 +5,21 @@ export const b2bApi = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
   withCredentials: true,
 });
+b2bApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("accessToken") || localStorage.getItem("otoddy_access_token") || localStorage.getItem("accessToken") ;
+
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+console.log(token);
+console.log(config.headers);
+console.log(config.headers.Authorization);
+  }
+console.log(token);
+console.log(config.headers);
+console.log(config.headers.Authorization);
+  return config;
+});
 
 export type Ride = {
   _id: string;

@@ -1,4 +1,5 @@
-// src/pages/ops/DashboardHome.tsx
+// src/pages/ops/DashboardHome.tsx (FULL UPDATED)
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { authStore } from "../../store/authStore";
@@ -10,6 +11,7 @@ import {
   opsCancelledRides,
   opsGetWithdrawals,
   opsEarningsByDate,
+  opsEarningsTotal, // ✅ NEW
   type Ride,
   type Withdrawal,
   type Driver,
@@ -33,6 +35,10 @@ type Stats = {
 
   earningsToday: number;
   ridesCountToday: number;
+
+  // ✅ NEW
+  earningsTotal: number;
+  ridesCountTotal: number;
 };
 
 function todayISO() {
@@ -57,20 +63,6 @@ function rideTabFromStatus(status?: string) {
   if (s.includes("cancelled")) return "cancelled";
   return "ongoing";
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export default function DashboardHome() {
   const user = authStore((s) => s.user);
@@ -118,10 +110,12 @@ export default function DashboardHome() {
 
       earningsToday: b2b ? 0 : prev?.earningsToday ?? 0,
       ridesCountToday: b2b ? 0 : prev?.ridesCountToday ?? 0,
+
+      // ✅ keep previous totals during ws recompute
+      earningsTotal: b2b ? 0 : prev?.earningsTotal ?? 0,
+      ridesCountTotal: b2b ? 0 : prev?.ridesCountTotal ?? 0,
     }));
   }
-
- 
 
   async function loadAll() {
     setErr("");
@@ -169,15 +163,19 @@ export default function DashboardHome() {
 
           earningsToday: 0,
           ridesCountToday: 0,
+
+          earningsTotal: 0,
+          ridesCountTotal: 0,
         });
         return;
       }
 
       // OPS/ADMIN: load drivers + withdrawals + earnings
-      const [driversRes, withdrawalsRes, earningsRes] = await Promise.all([
+      const [driversRes, withdrawalsRes, earningsRes, totalRes] = await Promise.all([
         opsListDrivers(),
         opsGetWithdrawals(),
         opsEarningsByDate(date),
+        opsEarningsTotal(), // ✅ NEW
       ]);
 
       driversRef.current = new Map((driversRes.drivers || []).map((d: any) => [String(d._id), d]));
@@ -207,6 +205,10 @@ export default function DashboardHome() {
 
         earningsToday: (earningsRes as any).totalEarnings ?? 0,
         ridesCountToday: (earningsRes as any).ridesCount ?? 0,
+
+        // ✅ totals
+        earningsTotal: (totalRes as any).totalEarnings ?? 0,
+        ridesCountTotal: (totalRes as any).ridesCount ?? 0,
       });
     } catch (e: any) {
       setErr(apiErrorMessage(e, "Failed to load dashboard stats"));
@@ -255,18 +257,27 @@ export default function DashboardHome() {
     const t = setInterval(async () => {
       try {
         const date = dateRef.current || todayISO();
-        const [wRes, eRes] = await Promise.all([opsGetWithdrawals(), opsEarningsByDate(date)]);
+        const [wRes, eRes, tRes] = await Promise.all([
+          opsGetWithdrawals(),
+          opsEarningsByDate(date),
+          opsEarningsTotal(), // ✅ NEW
+        ]);
+
         withdrawalsRef.current = (wRes as any).withdrawals || [];
 
         setStats((prev) => {
           if (!prev) return prev;
           const withdrawalsPending = withdrawalsRef.current.filter((w: any) => w.status === "pending").length;
+
           return {
             ...prev,
             withdrawalsTotal: withdrawalsRef.current.length,
             withdrawalsPending,
             earningsToday: (eRes as any).totalEarnings ?? prev.earningsToday,
             ridesCountToday: (eRes as any).ridesCount ?? prev.ridesCountToday,
+
+            earningsTotal: (tRes as any).totalEarnings ?? prev.earningsTotal,
+            ridesCountTotal: (tRes as any).ridesCount ?? prev.ridesCountTotal,
           };
         });
       } catch {
@@ -276,7 +287,6 @@ export default function DashboardHome() {
 
     return () => clearInterval(t);
   }, [b2b]);
-
 
   return (
     <div className="p-6 space-y-6">
@@ -323,7 +333,7 @@ export default function DashboardHome() {
               <StatCard title="Rides (Cancelled)" value={stats.ridesCancelled} meta="Cancelled" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <StatCard title="Drivers (Total)" value={stats.driversTotal} meta={`${stats.driversOnline} online`} />
               <StatCard title="Rides (Upcoming)" value={stats.ridesUpcoming} meta="Waiting for approval" />
               <StatCard title="Withdrawals (Pending)" value={stats.withdrawalsPending} meta={`${stats.withdrawalsTotal} total`} />
@@ -331,6 +341,11 @@ export default function DashboardHome() {
                 title="Today’s Earnings"
                 value={`₹${stats.earningsToday.toLocaleString("en-IN")}`}
                 meta={`${stats.ridesCountToday} completed rides`}
+              />
+              <StatCard
+                title="Total Earnings"
+                value={`₹${stats.earningsTotal.toLocaleString("en-IN")}`}
+                meta={`${stats.ridesCountTotal} completed rides`}
               />
             </div>
           )}
@@ -353,9 +368,7 @@ export default function DashboardHome() {
                 >
                   Open Rides
                 </Link>
-                <div className="mt-3 text-xs text-slate-500">
-                  Driver, payment, and earnings info dashboard par hide hai (B2B role).
-                </div>
+                <div className="mt-3 text-xs text-slate-500">Driver, payment, and earnings info dashboard par hide hai (B2B role).</div>
               </Panel>
             </div>
           ) : (
@@ -376,12 +389,11 @@ export default function DashboardHome() {
                 <Row label="Withdrawals (Total)" value={stats.withdrawalsTotal} />
                 <Row label="Withdrawals (Pending)" value={stats.withdrawalsPending} />
                 <Row label="Earnings (Today)" value={`₹${stats.earningsToday.toLocaleString("en-IN")}`} />
+                <Row label="Earnings (Total)" value={`₹${stats.earningsTotal.toLocaleString("en-IN")}`} />
                 <div className="mt-3 text-xs text-slate-500">Auto-refresh: 30s • Date: {todayISO()}</div>
               </Panel>
             </div>
           )}
-
-          
         </>
       )}
     </div>
