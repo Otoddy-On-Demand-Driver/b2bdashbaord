@@ -6,6 +6,7 @@ import {
   b2bCancelledRides,
   b2bCompletedRides,
   b2bFetchDriverLocation,
+  b2bCancelRide, // ✅ NEW
   type Ride,
 } from "../../lib/b2bApi";
 import { X, MapPin, Clock, AlertTriangle, User, Car, Briefcase } from "lucide-react";
@@ -199,7 +200,7 @@ export default function B2BRidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [openRideId, setOpenRideId] = useState<string | null>(null);
 
-  // ✅ SEARCH (NEW)
+  // ✅ SEARCH
   const [q, setQ] = useState("");
 
   async function load() {
@@ -233,7 +234,7 @@ export default function B2BRidesPage() {
     [rides, openRideId]
   );
 
-  // ✅ FILTERED RIDES (NEW)
+  // ✅ FILTERED RIDES
   const filteredRides = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return rides;
@@ -313,7 +314,7 @@ export default function B2BRidesPage() {
         ))}
       </div>
 
-      {/* ✅ Search + count (NEW) */}
+      {/* Search + count */}
       <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
         <input
           value={q}
@@ -373,23 +374,39 @@ export default function B2BRidesPage() {
 
       {/* Drawer */}
       {selectedRide ? (
-        <RideDrawerB2BViewOnlyWithLiveMap ride={selectedRide} onClose={() => setOpenRideId(null)} />
+        <RideDrawerB2BViewOnlyWithLiveMap
+          ride={selectedRide}
+          onClose={() => setOpenRideId(null)}
+          onAfterCancel={load} // ✅ refresh list after cancel
+        />
       ) : null}
     </div>
   );
 }
 
 /**
- * ✅ B2B View-Only Drawer WITH LEFT LIVE MAP + Start/End Ride Images
- * - Desktop: Left = map, Right = details
- * - Mobile: Map hidden
- * - Live driver location: polls backend every 5s using b2bFetchDriverLocation(driverId)
- * - Images: uses ride.start_car_images_ and ride.end_car_images (NO schema change)
+ * ✅ B2B Drawer WITH LEFT LIVE MAP + Start/End Images + CANCEL (with description)
+ * - Cancel allowed only if start_ride_time is null
+ * - On cancel: sends CancellationDescription + updates ride_status/cancelledAt
  */
-function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClose: () => void }) {
+function RideDrawerB2BViewOnlyWithLiveMap({
+  ride,
+  onClose,
+  onAfterCancel,
+}: {
+  ride: Ride;
+  onClose: () => void;
+  onAfterCancel: () => void;
+}) {
   const [err, setErr] = useState("");
   const [driverLoc, setDriverLoc] = useState<{ lat: number | null; lng: number | null } | null>(null);
   const [polling, setPolling] = useState(false);
+
+  // ✅ Cancel UI states
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelDesc, setCancelDesc] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelErr, setCancelErr] = useState("");
 
   // ✅ keep latest ride ref for polling closure safety
   const rideRef = useRef<Ride>(ride);
@@ -404,7 +421,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
 
   const driverId = (ride as any)?.AssignedDriver?.driverId || null;
 
-  // ✅ Images (NO rename, keep as-is)
+  // ✅ Images (NO rename)
   const startImages = normalizeUrls((ride as any).start_car_images_);
   const endImages = normalizeUrls((ride as any).end_car_images);
 
@@ -419,6 +436,11 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
       s.includes("approved");
     return hasDriver && looksOngoing;
   }, [(ride as any)?.ride_status, driverId]);
+
+  const isCancelable = useMemo(() => {
+    // ✅ your rule: cancel only till start ride
+    return !(ride as any)?.start_ride_time;
+  }, [ride]);
 
   async function fetchDriverOnce() {
     setErr("");
@@ -436,14 +458,12 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
     }
   }
 
-  // ✅ Start/stop polling when drawer opens or when assigned driver changes
+  // ✅ polling
   useEffect(() => {
     let timer: any = null;
 
-    // initial fetch
     fetchDriverOnce();
 
-    // start polling only if trackable
     if (isTrackable) {
       setPolling(true);
       timer = setInterval(() => {
@@ -464,7 +484,6 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
       ? `https://www.google.com/maps?q=${encodeURIComponent(`${driverLoc.lat},${driverLoc.lng}`)}`
       : null;
 
-  // Map center fallback
   const mapCenter: [number, number] =
     driverLoc?.lat != null && driverLoc?.lng != null
       ? [driverLoc.lat, driverLoc.lng]
@@ -490,6 +509,36 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
           ]
       : null;
 
+  async function submitCancel() {
+    setCancelErr("");
+    const desc = cancelDesc.trim();
+    if (!desc) {
+      setCancelErr("Please enter cancellation description.");
+      return;
+    }
+
+    try {
+      setCancelLoading(true);
+      const r = await b2bCancelRide((ride as any)._id, desc);
+
+      // ✅ local UI update (drawer)
+      (rideRef.current as any).ride_status = (r as any)?.ride?.ride_status || "cancelled by b2b client";
+      (rideRef.current as any).CancellationDescription = desc;
+      (rideRef.current as any).cancelledAt = (r as any)?.ride?.cancelledAt || new Date().toISOString();
+      (rideRef.current as any).cancelledBy = (r as any)?.ride?.cancelledBy || "b2bclient";
+
+      setCancelOpen(false);
+      setCancelDesc("");
+
+      // ✅ refresh list
+      onAfterCancel();
+    } catch (e: any) {
+      setCancelErr(e?.response?.data?.error || e?.message || "Failed to cancel ride");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="Close" />
@@ -499,7 +548,10 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
         {/* LEFT MAP (Desktop) */}
         <div className="hidden md:block flex-1 relative bg-slate-100">
           <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }}>
-            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
             {showPickup ? (
               <Marker icon={pinIcon} position={[pickupLat as number, pickupLng as number]}>
@@ -557,7 +609,7 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
         </div>
 
         {/* RIGHT DRAWER */}
-        <div className="h-full w-full sm:w-[680px] bg-white shadow-xl">
+        <div className="h-full w-full sm:w-[680px] bg-white shadow-xl relative">
           <div className="h-16 border-b border-slate-200 px-5 flex items-center justify-between">
             <div className="min-w-0">
               <div className="text-sm font-extrabold text-slate-900">Ride Details (B2B)</div>
@@ -603,7 +655,30 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
                 {(ride as any).pickup_location} → {(ride as any).drop_location}
               </div>
               <div className="mt-1 text-xs text-slate-500">Status: {(ride as any).ride_status}</div>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+
+              {/* ✅ Cancel ride (B2B) */}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!isCancelable}
+                  onClick={() => {
+                    setCancelErr("");
+                    setCancelDesc("");
+                    setCancelOpen(true);
+                  }}
+                  className={[
+                    "rounded-2xl px-4 py-2 text-sm font-semibold",
+                    isCancelable ? "bg-red-600 text-white hover:bg-red-700" : "bg-slate-200 text-slate-500 cursor-not-allowed",
+                  ].join(" ")}
+                >
+                  Cancel Ride
+                </button>
+                {!isCancelable ? (
+                  <div className="text-xs text-slate-500 self-center">Cancel disabled after ride starts.</div>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <Field
                   label="Fare (Est/Total)"
                   value={`${money((ride as any).fare_estimation)} / ${money((ride as any).total_fare)}`}
@@ -730,9 +805,71 @@ function RideDrawerB2BViewOnlyWithLiveMap({ ride, onClose }: { ride: Ride; onClo
                 <Field label="Car handover" value={fmtDate((ride as any).car_handover_time)} />
                 <Field label="Cancelled At" value={fmtDate((ride as any).cancelledAt)} />
                 <Field label="Cancellation Reason" value={(ride as any).cancellationReason} />
+                <Field label="Cancellation Description" value={(ride as any).CancellationDescription} />
               </div>
             </div>
           </div>
+
+          {/* ✅ Cancel Modal */}
+          {cancelOpen ? (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+              <button
+                className="absolute inset-0 bg-black/60"
+                onClick={() => setCancelOpen(false)}
+                aria-label="Close cancel modal"
+              />
+
+              <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                  <div className="text-sm font-extrabold text-slate-900">Cancel Ride</div>
+                  <button
+                    onClick={() => setCancelOpen(false)}
+                    className="rounded-xl p-2 hover:bg-slate-100"
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <div className="text-xs font-semibold text-slate-600">Reason / Description (required)</div>
+
+                  <textarea
+                    value={cancelDesc}
+                    onChange={(e) => setCancelDesc(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-slate-400"
+                    placeholder="Example: Customer not available, reschedule needed..."
+                  />
+
+                  {cancelErr ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {cancelErr}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setCancelOpen(false)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                      disabled={cancelLoading}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitCancel}
+                      className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      disabled={cancelLoading}
+                    >
+                      {cancelLoading ? "Cancelling..." : "Confirm Cancel"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
