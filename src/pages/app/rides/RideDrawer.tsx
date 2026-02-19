@@ -25,7 +25,8 @@ import {
   opsUpdateEmergency,
   opsDriverCoordinates, // ✅ ADD THIS
   opsUpdateRideTimes,
-
+  opsUploadRideMedia,
+  opsDeleteRideImage,
   type Driver,
   type Ride,
 } from "../../../lib/opsApi";
@@ -323,55 +324,55 @@ export default function RideDrawer({
   const r: any = ride || {};
 
   // ✅ incentive (before approve)
-const [incentiveOpen, setIncentiveOpen] = useState(false);
-const [incentive, setIncentive] = useState<string>("");
+  const [incentiveOpen, setIncentiveOpen] = useState(false);
+  const [incentive, setIncentive] = useState<string>("");
 
   const [editTimesOpen, setEditTimesOpen] = useState(false);
-const [timesForm, setTimesForm] = useState({
-  driver_assign_time: "",
-  driver_arrival_time: "",
-  start_ride_time: "",
-  end_ride_time: "",
-  car_handover_time: "",
-});
-
-function openTimesEditor() {
-  setErr("");
-  setEditTimesOpen(true);
-  setTimesForm({
-    driver_assign_time: toLocalInputValue(assignedAt),
-    driver_arrival_time: toLocalInputValue(r.driver_arrival_time),
-    start_ride_time: toLocalInputValue(r.start_ride_time),
-    end_ride_time: toLocalInputValue(r.end_ride_time),
-    car_handover_time: toLocalInputValue(r.car_handover_time),
+  const [timesForm, setTimesForm] = useState({
+    driver_assign_time: "",
+    driver_arrival_time: "",
+    start_ride_time: "",
+    end_ride_time: "",
+    car_handover_time: "",
   });
-}
 
-async function saveTimes() {
-  if (!rideId) return;
-  setBusy(true);
-  setErr("");
-
-  try {
-    const payload = {
-      driver_assign_time: fromLocalInputValue(timesForm.driver_assign_time),
-      driver_arrival_time: fromLocalInputValue(timesForm.driver_arrival_time),
-      start_ride_time: fromLocalInputValue(timesForm.start_ride_time),
-      end_ride_time: fromLocalInputValue(timesForm.end_ride_time),
-      car_handover_time: fromLocalInputValue(timesForm.car_handover_time),
-    };
-
-    await opsUpdateRideTimes(rideId, payload);
-
-    setEditTimesOpen(false);
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Time update failed"));
-  } finally {
-    setBusy(false);
+  function openTimesEditor() {
+    setErr("");
+    setEditTimesOpen(true);
+    setTimesForm({
+      driver_assign_time: toLocalInputValue(assignedAt),
+      driver_arrival_time: toLocalInputValue(r.driver_arrival_time),
+      start_ride_time: toLocalInputValue(r.start_ride_time),
+      end_ride_time: toLocalInputValue(r.end_ride_time),
+      car_handover_time: toLocalInputValue(r.car_handover_time),
+    });
   }
-}
+
+  async function saveTimes() {
+    if (!rideId) return;
+    setBusy(true);
+    setErr("");
+
+    try {
+      const payload = {
+        driver_assign_time: fromLocalInputValue(timesForm.driver_assign_time),
+        driver_arrival_time: fromLocalInputValue(timesForm.driver_arrival_time),
+        start_ride_time: fromLocalInputValue(timesForm.start_ride_time),
+        end_ride_time: fromLocalInputValue(timesForm.end_ride_time),
+        car_handover_time: fromLocalInputValue(timesForm.car_handover_time),
+      };
+
+      await opsUpdateRideTimes(rideId, payload);
+
+      setEditTimesOpen(false);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Time update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
 
   // ✅ LIVE driver location on map
@@ -399,19 +400,19 @@ async function saveTimes() {
   }, [open, rideId]);
 
   async function doApprove() {
-  if (!rideId) return;
-  setBusy(true);
-  try {
-    await opsApproveRide(rideId, Number(incentive || 0));
-    setIncentiveOpen(false);
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Approve failed"));
-  } finally {
-    setBusy(false);
+    if (!rideId) return;
+    setBusy(true);
+    try {
+      await opsApproveRide(rideId, Number(incentive || 0));
+      setIncentiveOpen(false);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Approve failed"));
+    } finally {
+      setBusy(false);
+    }
   }
-}
 
 
   async function doCancel() {
@@ -670,12 +671,12 @@ async function saveTimes() {
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
   // assignedAt
-const assignedAt =
-  r.driver_assign_time ||
-  r.driver_assigned_at ||
-  r.assigned_at ||
-  r.driverAssignedAt ||
-  null;
+  const assignedAt =
+    r.driver_assign_time ||
+    r.driver_assigned_at ||
+    r.assigned_at ||
+    r.driverAssignedAt ||
+    null;
   // meta (enums set at create time)
   const businessFunction = r.businessFunction ?? r.business_function ?? null;
   const tripCategory = r.tripCategory ?? r.trip_category ?? null;
@@ -849,63 +850,63 @@ const assignedAt =
 
               {/* Route + status */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 space-y-4">
-  {/* Header: Status + Fare */}
-  <div className="flex items-start justify-between gap-3">
-    <div>
-      <div className="text-xs font-semibold text-slate-500">Status</div>
-      <div className="mt-1">
-        <Badge tone="slate">{r.ride_status || "—"}</Badge>
-      </div>
-    </div>
+                {/* Header: Status + Fare */}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Status</div>
+                    <div className="mt-1">
+                      <Badge tone="slate">{r.ride_status || "—"}</Badge>
+                    </div>
+                  </div>
 
-    <div className="text-right">
-      <div className="text-xs font-semibold text-slate-500">Fare</div>
-      <div className="mt-1 text-lg font-extrabold text-slate-900 flex items-center justify-end gap-2">
-        <IndianRupee size={16} />
-        {money(r.fare_estimation || r.total_fare || 0)}
-      </div>
-    </div>
-  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-semibold text-slate-500">Fare</div>
+                    <div className="mt-1 text-lg font-extrabold text-slate-900 flex items-center justify-end gap-2">
+                      <IndianRupee size={16} />
+                      {money(r.fare_estimation || r.total_fare || 0)}
+                    </div>
+                  </div>
+                </div>
 
-  {/* Pickup */}
-  <div className="rounded-2xl border border-slate-200 bg-white p-3">
-    <div className="flex items-start gap-3">
-      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-green-600" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-extrabold text-slate-500">PICKUP</div>
-        <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
-          {r.pickup_location || "—"}
-        </div>
-      </div>
-    </div>
-  </div>
+                {/* Pickup */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-green-600" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-extrabold text-slate-500">PICKUP</div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
+                        {r.pickup_location || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-  {/* Drop */}
-  <div className="rounded-2xl border border-slate-200 bg-white p-3">
-    <div className="flex items-start gap-3">
-      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-600" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-extrabold text-slate-500">DROP</div>
-        <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
-          {r.drop_location || "—"}
-        </div>
-      </div>
-    </div>
-  </div>
+                {/* Drop */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-600" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-extrabold text-slate-500">DROP</div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
+                        {r.drop_location || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-  {/* Flags */}
-  <div className="flex flex-wrap gap-2">
-    {flags.length === 0 ? (
-      <span className="text-xs text-slate-500">No flags</span>
-    ) : (
-      flags.map((f) => (
-        <Badge key={f.key} tone={f.tone}>
-          {f.label}
-        </Badge>
-      ))
-    )}
-  </div>
-</div>
+                {/* Flags */}
+                <div className="flex flex-wrap gap-2">
+                  {flags.length === 0 ? (
+                    <span className="text-xs text-slate-500">No flags</span>
+                  ) : (
+                    flags.map((f) => (
+                      <Badge key={f.key} tone={f.tone}>
+                        {f.label}
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              </div>
 
 
               {/* Coordinates */}
@@ -962,18 +963,18 @@ const assignedAt =
 
               {/* Time  */}
               <div className="flex items-center justify-between gap-3">
-  <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-    <Clock size={18} />
-    Time Breakdown
-  </div>
+                <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                  <Clock size={18} />
+                  Time Breakdown
+                </div>
 
-  <button
-    disabled={busy}
-    onClick={openTimesEditor}
-    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
-  >
-    Edit Times
-  </button>
+                <button
+                  disabled={busy}
+                  onClick={openTimesEditor}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Edit Times
+                </button>
 
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
@@ -985,106 +986,106 @@ const assignedAt =
 
                   <Field label="Start → End" value={diffHrsMin(r.end_ride_time, r.start_ride_time)} />
                   <Field label="Assign → End" value={diffHrsMin(r.end_ride_time, assignedAt)} />
-                  <Field label="Arrived → Start" value={diffHrsMin(r.start_ride_time,r.driver_arrival_time)}/>
-                   <Field label="Arrived → End" value={diffHrsMin(r.end_ride_time, r.driver_arrival_time)} />
+                  <Field label="Arrived → Start" value={diffHrsMin(r.start_ride_time, r.driver_arrival_time)} />
+                  <Field label="Arrived → End" value={diffHrsMin(r.end_ride_time, r.driver_arrival_time)} />
 
-  {/* ✅ NEW 2 */}
-  <Field
-    label="Start → End (Minus 90 mins)"
-    value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)}
-  />
+                  {/* ✅ NEW 2 */}
+                  <Field
+                    label="Start → End (Minus 90 mins)"
+                    value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)}
+                  />
 
-  {/* ✅ NEW 3 */}
-  <Field
-    label="Estimated → Actual Arrival"
-    value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)}
-  />
-             
+                  {/* ✅ NEW 3 */}
+                  <Field
+                    label="Estimated → Actual Arrival"
+                    value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)}
+                  />
+
                 </div>
               </div>
 
-{editTimesOpen ? (
-  <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-    <button className="absolute inset-0 bg-black/30" onClick={() => setEditTimesOpen(false)} />
-    <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-extrabold text-slate-900">Edit Ride Times</div>
-        <button onClick={() => setEditTimesOpen(false)} className="rounded-xl p-2 hover:bg-slate-100">
-          <X size={18} />
-        </button>
-      </div>
+              {editTimesOpen ? (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                  <button className="absolute inset-0 bg-black/30" onClick={() => setEditTimesOpen(false)} />
+                  <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-extrabold text-slate-900">Edit Ride Times</div>
+                      <button onClick={() => setEditTimesOpen(false)} className="rounded-xl p-2 hover:bg-slate-100">
+                        <X size={18} />
+                      </button>
+                    </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3">
-        <label className="text-xs font-semibold text-slate-600">
-          Assign Time
-          <input
-            type="datetime-local"
-            value={timesForm.driver_assign_time}
-            onChange={(e) => setTimesForm((p) => ({ ...p, driver_assign_time: e.target.value }))}
-            className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-          />
-        </label>
+                    <div className="mt-4 grid grid-cols-1 gap-3">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Assign Time
+                        <input
+                          type="datetime-local"
+                          value={timesForm.driver_assign_time}
+                          onChange={(e) => setTimesForm((p) => ({ ...p, driver_assign_time: e.target.value }))}
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
 
-        <label className="text-xs font-semibold text-slate-600">
-          Arrival Time
-          <input
-            type="datetime-local"
-            value={timesForm.driver_arrival_time}
-            onChange={(e) => setTimesForm((p) => ({ ...p, driver_arrival_time: e.target.value }))}
-            className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-          />
-        </label>
+                      <label className="text-xs font-semibold text-slate-600">
+                        Arrival Time
+                        <input
+                          type="datetime-local"
+                          value={timesForm.driver_arrival_time}
+                          onChange={(e) => setTimesForm((p) => ({ ...p, driver_arrival_time: e.target.value }))}
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
 
-        <label className="text-xs font-semibold text-slate-600">
-          Start Ride Time
-          <input
-            type="datetime-local"
-            value={timesForm.start_ride_time}
-            onChange={(e) => setTimesForm((p) => ({ ...p, start_ride_time: e.target.value }))}
-            className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-          />
-        </label>
+                      <label className="text-xs font-semibold text-slate-600">
+                        Start Ride Time
+                        <input
+                          type="datetime-local"
+                          value={timesForm.start_ride_time}
+                          onChange={(e) => setTimesForm((p) => ({ ...p, start_ride_time: e.target.value }))}
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
 
-        <label className="text-xs font-semibold text-slate-600">
-          End Ride Time
-          <input
-            type="datetime-local"
-            value={timesForm.end_ride_time}
-            onChange={(e) => setTimesForm((p) => ({ ...p, end_ride_time: e.target.value }))}
-            className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-          />
-        </label>
+                      <label className="text-xs font-semibold text-slate-600">
+                        End Ride Time
+                        <input
+                          type="datetime-local"
+                          value={timesForm.end_ride_time}
+                          onChange={(e) => setTimesForm((p) => ({ ...p, end_ride_time: e.target.value }))}
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
 
-        <label className="text-xs font-semibold text-slate-600">
-          Car Handover Time
-          <input
-            type="datetime-local"
-            value={timesForm.car_handover_time}
-            onChange={(e) => setTimesForm((p) => ({ ...p, car_handover_time: e.target.value }))}
-            className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-          />
-        </label>
-      </div>
+                      <label className="text-xs font-semibold text-slate-600">
+                        Car Handover Time
+                        <input
+                          type="datetime-local"
+                          value={timesForm.car_handover_time}
+                          onChange={(e) => setTimesForm((p) => ({ ...p, car_handover_time: e.target.value }))}
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+                    </div>
 
-      <div className="mt-5 flex gap-2">
-        <button
-          onClick={() => setEditTimesOpen(false)}
-          className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
-        >
-          Close
-        </button>
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => setEditTimesOpen(false)}
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                      >
+                        Close
+                      </button>
 
-        <button
-          disabled={busy}
-          onClick={saveTimes}
-          className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
+                      <button
+                        disabled={busy}
+                        onClick={saveTimes}
+                        className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
 
               {/* Car details */}
@@ -1199,19 +1200,132 @@ const assignedAt =
                 </div>
 
                 <div className="mt-3">
-                  <div className="text-xs font-semibold text-slate-500">Start Car Images</div>
-                  <div className="mt-2">
-                    <ImageStrip urls={startImgs} />
-                  </div>
-                </div>
+  <div className="flex items-center justify-between">
+    <div className="text-xs font-semibold text-slate-500">
+      Start Car Images
+    </div>
+
+    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+      Upload
+      <input
+        type="file"
+        multiple
+        className="hidden"
+        onChange={async (e) => {
+          if (!rideId || !e.target.files?.length) return;
+          setBusy(true);
+          try {
+            await opsUploadRideMedia(rideId, "start", e.target.files);
+            await load();
+            onMutated();
+          } catch (err: any) {
+            setErr(apiErrorMessage(err, "Upload failed"));
+          } finally {
+            setBusy(false);
+            e.target.value = "";
+          }
+        }}
+      />
+    </label>
+  </div>
+
+  <div className="mt-3 flex gap-3 flex-wrap">
+    {startImgs.map((u, idx) => (
+      <div key={u + idx} className="relative">
+        <img
+          src={u}
+          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
+        />
+
+        <button
+          disabled={busy}
+          onClick={async () => {
+            if (!rideId) return;
+            if (!confirm("Delete this image?")) return;
+            setBusy(true);
+            try {
+              await opsDeleteRideImage(rideId, "start", idx);
+              await load();
+              onMutated();
+            } catch (err: any) {
+              setErr(apiErrorMessage(err, "Delete failed"));
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
+        >
+          ✕
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
+
 
                 <div className="mt-4">
-                  <div className="text-xs font-semibold text-slate-500">End Car Images</div>
-                  <div className="mt-2">
-                    <ImageStrip urls={endImgs} />
-                  </div>
-                </div>
-              </div>
+  <div className="flex items-center justify-between">
+    <div className="text-xs font-semibold text-slate-500">
+      End Car Images
+    </div>
+
+    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+      Upload
+      <input
+        type="file"
+        multiple
+        className="hidden"
+        onChange={async (e) => {
+          if (!rideId || !e.target.files?.length) return;
+          setBusy(true);
+          try {
+            await opsUploadRideMedia(rideId, "end", e.target.files);
+            await load();
+            onMutated();
+          } catch (err: any) {
+            setErr(apiErrorMessage(err, "Upload failed"));
+          } finally {
+            setBusy(false);
+            e.target.value = "";
+          }
+        }}
+      />
+    </label>
+  </div>
+
+  <div className="mt-3 flex gap-3 flex-wrap">
+    {endImgs.map((u, idx) => (
+      <div key={u + idx} className="relative">
+        <img
+          src={u}
+          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
+        />
+
+        <button
+          disabled={busy}
+          onClick={async () => {
+            if (!rideId) return;
+            if (!confirm("Delete this image?")) return;
+            setBusy(true);
+            try {
+              await opsDeleteRideImage(rideId, "end", idx);
+              await load();
+              onMutated();
+            } catch (err: any) {
+              setErr(apiErrorMessage(err, "Delete failed"));
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
+        >
+          ✕
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
+</div>
 
               {/* Actions */}
               <div className="sticky bottom-0 bg-white pt-2">
@@ -1219,11 +1333,11 @@ const assignedAt =
                   <div className="flex gap-2">
                     <button
                       disabled={!canApprove || busy}
-onClick={() => {
-  setErr("");
-  setIncentive(String((r as any)?.insentive_amount ?? "")); // optional prefill
-  setIncentiveOpen(true);
-}}
+                      onClick={() => {
+                        setErr("");
+                        setIncentive(String((r as any)?.insentive_amount ?? "")); // optional prefill
+                        setIncentiveOpen(true);
+                      }}
                       className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                     >
                       <CheckCircle2 size={18} />
@@ -1340,80 +1454,80 @@ onClick={() => {
               ) : null}
 
 
-{/* ✅ Incentive modal (before approve) */}
-{incentiveOpen ? (
-  <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-    <button
-      className="absolute inset-0 bg-black/30"
-      onClick={() => setIncentiveOpen(false)}
-    />
-    <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-extrabold text-slate-900">Add Incentive</div>
-        <button
-          onClick={() => setIncentiveOpen(false)}
-          className="rounded-xl p-2 hover:bg-slate-100"
-        >
-          <X size={18} />
-        </button>
-      </div>
+              {/* ✅ Incentive modal (before approve) */}
+              {incentiveOpen ? (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                  <button
+                    className="absolute inset-0 bg-black/30"
+                    onClick={() => setIncentiveOpen(false)}
+                  />
+                  <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-extrabold text-slate-900">Add Incentive</div>
+                      <button
+                        onClick={() => setIncentiveOpen(false)}
+                        className="rounded-xl p-2 hover:bg-slate-100"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
 
-      <div className="mt-4">
-        <label className="block text-xs font-semibold text-slate-600">
-          Incentive Amount (₹)
-        </label>
-        <input
-          value={incentive}
-          onChange={(e) => {
-            // allow only numbers
-            const v = e.target.value.replace(/[^\d]/g, "");
-            setIncentive(v);
-          }}
-          placeholder="0"
-          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-        />
+                    <div className="mt-4">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        Incentive Amount (₹)
+                      </label>
+                      <input
+                        value={incentive}
+                        onChange={(e) => {
+                          // allow only numbers
+                          const v = e.target.value.replace(/[^\d]/g, "");
+                          setIncentive(v);
+                        }}
+                        placeholder="0"
+                        className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                      />
 
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Fare</span>
-            <span className="font-extrabold text-slate-900">
-              {money(r.fare_estimation || r.total_fare || 0)}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Incentive</span>
-            <span className="font-extrabold text-slate-900">{money(incentive || 0)}</span>
-          </div>
+                      <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Fare</span>
+                          <span className="font-extrabold text-slate-900">
+                            {money(r.fare_estimation || r.total_fare || 0)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Incentive</span>
+                          <span className="font-extrabold text-slate-900">{money(incentive || 0)}</span>
+                        </div>
 
-          {/* simple total */}
-          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
-            <span className="text-xs font-semibold text-slate-500">Total shown to driver</span>
-            <span className="text-sm font-extrabold text-slate-900">
-              {money(Number(r.fare_estimation || r.total_fare || 0) + Number(incentive || 0))}
-            </span>
-          </div>
-        </div>
-      </div>
+                        {/* simple total */}
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
+                          <span className="text-xs font-semibold text-slate-500">Total shown to driver</span>
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {money(Number(r.fare_estimation || r.total_fare || 0) + Number(incentive || 0))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-      <div className="mt-5 flex gap-2">
-        <button
-          onClick={() => setIncentiveOpen(false)}
-          className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
-        >
-          Cancel
-        </button>
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => setIncentiveOpen(false)}
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                      >
+                        Cancel
+                      </button>
 
-        <button
-          disabled={busy}
-          onClick={doApprove}
-          className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Approve Ride
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
+                      <button
+                        disabled={busy}
+                        onClick={doApprove}
+                        className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Approve Ride
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Ops Review modal */}
               {reviewOpen ? (

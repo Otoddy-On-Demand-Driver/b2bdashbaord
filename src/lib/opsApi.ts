@@ -320,3 +320,40 @@ export async function opsEarningsTotal() {
     ridesCount: number;
   };
 }
+
+
+export async function opsUploadRideMedia(
+  rideId: string,
+  type: "start" | "end",
+  files: FileList | File[]
+) {
+  const fd = new FormData();
+  fd.append("rideId", rideId);
+  fd.append("type", type);
+
+  Array.from(files).forEach((f) => {
+    fd.append("media", f);
+  });
+
+  const { data } = await api.post("/b2bclient/upload-ride-media", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  return data;
+}
+
+export async function opsDeleteRideImage(
+  rideId: string,
+  type: "start" | "end",
+  index: number
+) {
+  const { data } = await api.post("/b2bclient/delete-ride-image", {
+    rideId,
+    type,
+    index,
+  });
+
+  return data;
+}
+
+
