@@ -23,7 +23,7 @@ import {
   opsAssignDriver,
   opsSubmitRideReview,
   opsUpdateEmergency,
-  opsDriverCoordinates, // ✅ ADD THIS
+  opsDriverCoordinates, // ✅
   opsUpdateRideTimes,
   opsUploadRideMedia,
   opsDeleteRideImage,
@@ -107,7 +107,6 @@ function diffMinusMinutes(a: any, b: any, minusMinutes: number) {
   return `${sign}${h}h ${m}m`;
 }
 
-
 function toLocalInputValue(v: any) {
   if (!v) return "";
   const d = new Date(v);
@@ -125,6 +124,29 @@ function fromLocalInputValue(v: string) {
   return d.toISOString();
 }
 
+/** ✅ Distance helpers */
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const sin1 = Math.sin(dLat / 2);
+  const sin2 = Math.sin(dLng / 2);
+
+  const h = sin1 * sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2 * sin2;
+  const c = 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+  return R * c;
+}
+
+function fmtKm(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toFixed(2)} km` : "—";
+}
 
 /* ----------------------------- UI bits ----------------------------- */
 function Badge({
@@ -170,10 +192,6 @@ function Recenter({ center }: { center: [number, number] }) {
   return null;
 }
 
-
-
-
-
 /* ----------------------------- Component ----------------------------- */
 export default function RideDrawer({
   rideId,
@@ -209,12 +227,12 @@ export default function RideDrawer({
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [emergencyResolved, setEmergencyResolved] = useState(false);
   const [emergencyNotes, setEmergencyNotes] = useState("");
-  const r: any = ride || {};
 
   // ✅ incentive (before approve)
   const [incentiveOpen, setIncentiveOpen] = useState(false);
   const [incentive, setIncentive] = useState<string>("");
 
+  // ✅ times editor
   const [editTimesOpen, setEditTimesOpen] = useState(false);
   const [timesForm, setTimesForm] = useState({
     driver_assign_time: "",
@@ -223,6 +241,33 @@ export default function RideDrawer({
     end_ride_time: "",
     car_handover_time: "",
   });
+
+  // ✅ LIVE driver location on map
+  const [liveDriverLoc, setLiveDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
+
+  // ✅ nearest drivers (pickup se)
+  const [nearestDrivers, setNearestDrivers] = useState<
+    Array<{ driverId: string; lat: number; lng: number; kmFromPickup: number }>
+  >([]);
+
+  const r: any = ride || {};
+
+  // ✅ coords (declare BEFORE hooks that use these in deps)
+  const pickupLat = r.pickup_latitude;
+  const pickupLng = r.pickup_longitude;
+  const dropLat = r.drop_latitude;
+  const dropLng = r.drop_longitude;
+
+  const pickupOk = isNum(pickupLat) && isNum(pickupLng);
+  const dropOk = isNum(dropLat) && isNum(dropLng);
+
+  // ✅ assignedAt (declare before using in functions that run later)
+  const assignedAt =
+    r.driver_assign_time ||
+    r.driver_assigned_at ||
+    r.assigned_at ||
+    r.driverAssignedAt ||
+    null;
 
   function openTimesEditor() {
     setErr("");
@@ -262,12 +307,6 @@ export default function RideDrawer({
     }
   }
 
-
-  // ✅ LIVE driver location on map
-  const [liveDriverLoc, setLiveDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
-
-  // ✅ keep a safe object for memos/effects (NO hooks after early return)
-
   async function load() {
     if (!rideId) return;
     setErr("");
@@ -301,7 +340,6 @@ export default function RideDrawer({
       setBusy(false);
     }
   }
-
 
   async function doCancel() {
     if (!rideId) return;
@@ -368,9 +406,6 @@ export default function RideDrawer({
     }
   }
 
-
-
-
   const canApprove = useMemo(
     () => ride?.ride_status === "waiting for approval",
     [ride?.ride_status]
@@ -397,7 +432,6 @@ export default function RideDrawer({
       s === "car handed over"
     );
   }, [r?.ride_status]);
-
 
   // ✅ driver id for filtering socket payloads
   const assignedDriverId = useMemo(() => {
@@ -444,47 +478,56 @@ export default function RideDrawer({
     return v ? String(v) : null;
   }, [r?.AssignedDriver]);
 
-  // ✅ FRONTEND-ONLY LIVE GPS: poll /ops/drivers/coordinates every 5s
+  // ✅ FRONTEND-ONLY LIVE GPS + NEAREST DRIVERS: poll /ops/drivers/coordinates every 5s
   useEffect(() => {
     if (!open) return;
 
     let t: any = null;
 
     async function poll() {
-      if (!driverIdForGps) return;
-
       try {
         const resp = await opsDriverCoordinates();
-        const row = (resp.coordinates || []).find(
-          (x) => String(x.driverId) === String(driverIdForGps)
-        );
+        const coords = Array.isArray(resp.coordinates) ? resp.coordinates : [];
 
-        if (
-          row &&
-          typeof row.lat === "number" &&
-          typeof row.lng === "number"
-        ) {
-          setLiveDriverLoc({
-            lat: row.lat,
-            lng: row.lng,
-          });
+        // ✅ live assigned driver
+        if (driverIdForGps) {
+          const row = coords.find((x: any) => String(x.driverId) === String(driverIdForGps));
+          if (row && typeof row.lat === "number" && typeof row.lng === "number") {
+            setLiveDriverLoc({ lat: row.lat, lng: row.lng });
+          }
         }
 
+        // ✅ nearest drivers from pickup
+        if (pickupOk) {
+          const pickup = { lat: pickupLat, lng: pickupLng };
+
+          const list = coords
+            .filter(
+              (x: any) => typeof x?.lat === "number" && typeof x?.lng === "number" && x?.driverId
+            )
+            .map((x: any) => {
+              const km = haversineKm(pickup, { lat: x.lat, lng: x.lng });
+              return { driverId: String(x.driverId), lat: x.lat, lng: x.lng, kmFromPickup: km };
+            })
+            .sort((a: any, b: any) => a.kmFromPickup - b.kmFromPickup)
+            .slice(0, 5);
+
+          setNearestDrivers(list);
+        } else {
+          setNearestDrivers([]);
+        }
       } catch {
-        // optional: setErr("GPS fetch failed")
+        // optional
       }
     }
 
-    poll(); // initial
+    poll();
     t = setInterval(poll, 5000);
 
     return () => {
       if (t) clearInterval(t);
     };
-  }, [open, driverIdForGps]);
-
-
-
+  }, [open, driverIdForGps, pickupOk, pickupLat, pickupLng]);
 
   // ✅ open review modal (prefill)
   function openReview() {
@@ -544,12 +587,6 @@ export default function RideDrawer({
   // ✅ IMPORTANT: early return AFTER all hooks
   if (!open) return null;
 
-  // coords
-  const pickupLat = r.pickup_latitude;
-  const pickupLng = r.pickup_longitude;
-  const dropLat = r.drop_latitude;
-  const dropLng = r.drop_longitude;
-
   // images
   const startImgs: string[] = Array.isArray(r.start_car_images)
     ? r.start_car_images
@@ -558,13 +595,6 @@ export default function RideDrawer({
       : [];
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
-  // assignedAt
-  const assignedAt =
-    r.driver_assign_time ||
-    r.driver_assigned_at ||
-    r.assigned_at ||
-    r.driverAssignedAt ||
-    null;
   // meta (enums set at create time)
   const businessFunction = r.businessFunction ?? r.business_function ?? null;
   const tripCategory = r.tripCategory ?? r.trip_category ?? null;
@@ -585,11 +615,35 @@ export default function RideDrawer({
 
   const showEmergencyBanner = !!r.isEmergency;
 
+  // ✅ distances
+  const driverOk = !!liveDriverLoc && isNum(liveDriverLoc.lat) && isNum(liveDriverLoc.lng);
+
+  const pickupToDropKm =
+    pickupOk && dropOk
+      ? haversineKm({ lat: pickupLat, lng: pickupLng }, { lat: dropLat, lng: dropLng })
+      : null;
+
+  const driverToPickupKm =
+    driverOk && pickupOk
+      ? haversineKm(
+          { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
+          { lat: pickupLat, lng: pickupLng }
+        )
+      : null;
+
+  const driverToDropKm =
+    driverOk && dropOk
+      ? haversineKm(
+          { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
+          { lat: dropLat, lng: dropLng }
+        )
+      : null;
+
   // Map center fallback
   const mapCenter: [number, number] =
     liveDriverLoc
       ? [liveDriverLoc.lat, liveDriverLoc.lng]
-      : isNum(pickupLat) && isNum(pickupLng)
+      : pickupOk
         ? [pickupLat, pickupLng]
         : [28.6139, 77.209];
 
@@ -610,13 +664,13 @@ export default function RideDrawer({
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                {isNum(pickupLat) && isNum(pickupLng) ? (
+                {pickupOk ? (
                   <Marker icon={pinIcon} position={[pickupLat, pickupLng]}>
                     <Popup>Pickup</Popup>
                   </Marker>
                 ) : null}
 
-                {isNum(dropLat) && isNum(dropLng) ? (
+                {dropOk ? (
                   <Marker icon={pinIcon} position={[dropLat, dropLng]}>
                     <Popup>Drop</Popup>
                   </Marker>
@@ -628,20 +682,33 @@ export default function RideDrawer({
                   </Marker>
                 ) : null}
 
+                {/* ✅ Nearest drivers markers (from pickup) */}
+                {pickupOk
+                  ? nearestDrivers.map((d) => (
+                      <Marker key={d.driverId} icon={pinIcon} position={[d.lat, d.lng]}>
+                        <Popup>
+                          Nearest Driver • {d.driverId}
+                          <br />
+                          {d.kmFromPickup.toFixed(2)} km from pickup
+                        </Popup>
+                      </Marker>
+                    ))
+                  : null}
+
                 {/* Route line */}
-                {isNum(pickupLat) && isNum(pickupLng) && isNum(dropLat) && isNum(dropLng) ? (
+                {pickupOk && dropOk ? (
                   <Polyline
                     positions={
                       liveDriverLoc
                         ? [
-                          [pickupLat, pickupLng],
-                          [liveDriverLoc.lat, liveDriverLoc.lng],
-                          [dropLat, dropLng],
-                        ]
+                            [pickupLat, pickupLng],
+                            [liveDriverLoc.lat, liveDriverLoc.lng],
+                            [dropLat, dropLng],
+                          ]
                         : [
-                          [pickupLat, pickupLng],
-                          [dropLat, dropLng],
-                        ]
+                            [pickupLat, pickupLng],
+                            [dropLat, dropLng],
+                          ]
                     }
                   />
                 ) : null}
@@ -654,6 +721,17 @@ export default function RideDrawer({
                   {liveDriverLoc
                     ? `${liveDriverLoc.lat.toFixed(5)}, ${liveDriverLoc.lng.toFixed(5)}`
                     : "Waiting for GPS..."}
+                </div>
+
+                <div className="mt-2 text-[11px] font-semibold text-slate-600 space-y-0.5">
+                  <div>Pickup → Drop: {fmtKm(pickupToDropKm)}</div>
+                  <div>Driver → Pickup: {fmtKm(driverToPickupKm)}</div>
+                  <div>Driver → Drop: {fmtKm(driverToDropKm)}</div>
+                  {nearestDrivers[0] ? (
+                    <div>
+                      Nearest: {nearestDrivers[0].driverId} • {fmtKm(nearestDrivers[0].kmFromPickup)}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </>
@@ -696,11 +774,7 @@ export default function RideDrawer({
                     <div className="flex items-center gap-2 text-red-700">
                       <AlertTriangle size={20} />
                       <div className="text-sm font-extrabold">Emergency Reported</div>
-                      {r.isEmergencyResolved ? (
-                        <Badge tone="blue">Resolved</Badge>
-                      ) : (
-                        <Badge tone="red">Unresolved</Badge>
-                      )}
+                      {r.isEmergencyResolved ? <Badge tone="blue">Resolved</Badge> : <Badge tone="red">Unresolved</Badge>}
                     </div>
 
                     <button
@@ -796,23 +870,57 @@ export default function RideDrawer({
                 </div>
               </div>
 
-
               {/* Coordinates */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Field
                     label="Pickup (lat, lng)"
-                    value={isNum(pickupLat) && isNum(pickupLng) ? `${pickupLat}, ${pickupLng}` : "—"}
+                    value={pickupOk ? `${pickupLat}, ${pickupLng}` : "—"}
                   />
                   <Field
                     label="Drop (lat, lng)"
-                    value={isNum(dropLat) && isNum(dropLng) ? `${dropLat}, ${dropLng}` : "—"}
+                    value={dropOk ? `${dropLat}, ${dropLng}` : "—"}
                   />
                 </div>
               </div>
 
-              {/* Schedule + descriptiooooons */}
+              {/* ✅ Distances */}
+              <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-extrabold text-slate-900">Distances</div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Field label="Pickup → Drop" value={fmtKm(pickupToDropKm)} />
+                  <Field label="Driver → Pickup (Live)" value={fmtKm(driverToPickupKm)} />
+                  <Field label="Driver → Drop (Live)" value={fmtKm(driverToDropKm)} />
+                  <Field
+                    label="Nearest Driver (from Pickup)"
+                    value={
+                      nearestDrivers.length
+                        ? `${fmtKm(nearestDrivers[0].kmFromPickup)} • ID: ${nearestDrivers[0].driverId}`
+                        : "—"
+                    }
+                  />
+                </div>
+
+                {nearestDrivers.length ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-xs font-semibold text-slate-600">Nearest Drivers (Top 5)</div>
+                    <div className="mt-2 space-y-1">
+                      {nearestDrivers.map((d, i) => (
+                        <div key={d.driverId} className="flex items-center justify-between text-sm">
+                          <div className="font-semibold text-slate-800">
+                            #{i + 1} • {d.driverId}
+                          </div>
+                          <div className="font-semibold text-slate-900">{fmtKm(d.kmFromPickup)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Schedule + descriptions */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
                   <Clock size={18} />
@@ -829,7 +937,7 @@ export default function RideDrawer({
                 </div>
               </div>
 
-              {/* Booking Meta (Create-time enums + optional fields) */}
+              {/* Booking Meta */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-sm font-extrabold text-slate-900">Booking Meta</div>
 
@@ -848,22 +956,22 @@ export default function RideDrawer({
                 </div>
               </div>
 
+              {/* Time Breakdown */}
+              <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                    <Clock size={18} />
+                    Time Breakdown
+                  </div>
 
-              {/* Time  */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-                  <Clock size={18} />
-                  Time Breakdown
+                  <button
+                    disabled={busy}
+                    onClick={openTimesEditor}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Edit Times
+                  </button>
                 </div>
-
-                <button
-                  disabled={busy}
-                  onClick={openTimesEditor}
-                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Edit Times
-                </button>
-
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Field label="Assigned At" value={fmtDate(assignedAt)} />
@@ -877,18 +985,15 @@ export default function RideDrawer({
                   <Field label="Arrived → Start" value={diffHrsMin(r.start_ride_time, r.driver_arrival_time)} />
                   <Field label="Arrived → End" value={diffHrsMin(r.end_ride_time, r.driver_arrival_time)} />
 
-                  {/* ✅ NEW 2 */}
                   <Field
                     label="Start → End (Minus 90 mins)"
                     value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)}
                   />
 
-                  {/* ✅ NEW 3 */}
                   <Field
                     label="Estimated → Actual Arrival"
                     value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)}
                   />
-
                 </div>
               </div>
 
@@ -974,7 +1079,6 @@ export default function RideDrawer({
                   </div>
                 </div>
               ) : null}
-
 
               {/* Car details */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
@@ -1087,133 +1191,130 @@ export default function RideDrawer({
                   Car Images
                 </div>
 
+                {/* Start Images */}
                 <div className="mt-3">
-  <div className="flex items-center justify-between">
-    <div className="text-xs font-semibold text-slate-500">
-      Start Car Images
-    </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-500">Start Car Images</div>
 
-    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-      Upload
-      <input
-        type="file"
-        multiple
-        className="hidden"
-        onChange={async (e) => {
-          if (!rideId || !e.target.files?.length) return;
-          setBusy(true);
-          try {
-            await opsUploadRideMedia(rideId, "start", e.target.files);
-            await load();
-            onMutated();
-          } catch (err: any) {
-            setErr(apiErrorMessage(err, "Upload failed"));
-          } finally {
-            setBusy(false);
-            e.target.value = "";
-          }
-        }}
-      />
-    </label>
-  </div>
+                    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                      Upload
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          if (!rideId || !e.target.files?.length) return;
+                          setBusy(true);
+                          try {
+                            await opsUploadRideMedia(rideId, "start", e.target.files);
+                            await load();
+                            onMutated();
+                          } catch (err: any) {
+                            setErr(apiErrorMessage(err, "Upload failed"));
+                          } finally {
+                            setBusy(false);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
 
-  <div className="mt-3 flex gap-3 flex-wrap">
-    {startImgs.map((u, idx) => (
-      <div key={u + idx} className="relative">
-        <img
-          src={u}
-          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
-        />
+                  <div className="mt-3 flex gap-3 flex-wrap">
+                    {startImgs.map((u, idx) => (
+                      <div key={u + idx} className="relative">
+                        <img
+                          src={u}
+                          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
+                        />
 
-        <button
-          disabled={busy}
-          onClick={async () => {
-            if (!rideId) return;
-            if (!confirm("Delete this image?")) return;
-            setBusy(true);
-            try {
-              await opsDeleteRideImage(rideId, "start", idx);
-              await load();
-              onMutated();
-            } catch (err: any) {
-              setErr(apiErrorMessage(err, "Delete failed"));
-            } finally {
-              setBusy(false);
-            }
-          }}
-          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
-        >
-          ✕
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            if (!rideId) return;
+                            if (!confirm("Delete this image?")) return;
+                            setBusy(true);
+                            try {
+                              await opsDeleteRideImage(rideId, "start", idx);
+                              await load();
+                              onMutated();
+                            } catch (err: any) {
+                              setErr(apiErrorMessage(err, "Delete failed"));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-
+                {/* End Images */}
                 <div className="mt-4">
-  <div className="flex items-center justify-between">
-    <div className="text-xs font-semibold text-slate-500">
-      End Car Images
-    </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-500">End Car Images</div>
 
-    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-      Upload
-      <input
-        type="file"
-        multiple
-        className="hidden"
-        onChange={async (e) => {
-          if (!rideId || !e.target.files?.length) return;
-          setBusy(true);
-          try {
-            await opsUploadRideMedia(rideId, "end", e.target.files);
-            await load();
-            onMutated();
-          } catch (err: any) {
-            setErr(apiErrorMessage(err, "Upload failed"));
-          } finally {
-            setBusy(false);
-            e.target.value = "";
-          }
-        }}
-      />
-    </label>
-  </div>
+                    <label className="cursor-pointer rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                      Upload
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          if (!rideId || !e.target.files?.length) return;
+                          setBusy(true);
+                          try {
+                            await opsUploadRideMedia(rideId, "end", e.target.files);
+                            await load();
+                            onMutated();
+                          } catch (err: any) {
+                            setErr(apiErrorMessage(err, "Upload failed"));
+                          } finally {
+                            setBusy(false);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
 
-  <div className="mt-3 flex gap-3 flex-wrap">
-    {endImgs.map((u, idx) => (
-      <div key={u + idx} className="relative">
-        <img
-          src={u}
-          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
-        />
+                  <div className="mt-3 flex gap-3 flex-wrap">
+                    {endImgs.map((u, idx) => (
+                      <div key={u + idx} className="relative">
+                        <img
+                          src={u}
+                          className="h-24 w-32 rounded-2xl object-cover border border-slate-200"
+                        />
 
-        <button
-          disabled={busy}
-          onClick={async () => {
-            if (!rideId) return;
-            if (!confirm("Delete this image?")) return;
-            setBusy(true);
-            try {
-              await opsDeleteRideImage(rideId, "end", idx);
-              await load();
-              onMutated();
-            } catch (err: any) {
-              setErr(apiErrorMessage(err, "Delete failed"));
-            } finally {
-              setBusy(false);
-            }
-          }}
-          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
-        >
-          ✕
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
-</div>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            if (!rideId) return;
+                            if (!confirm("Delete this image?")) return;
+                            setBusy(true);
+                            try {
+                              await opsDeleteRideImage(rideId, "end", idx);
+                              await load();
+                              onMutated();
+                            } catch (err: any) {
+                              setErr(apiErrorMessage(err, "Delete failed"));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
               {/* Actions */}
               <div className="sticky bottom-0 bg-white pt-2">
@@ -1223,7 +1324,7 @@ export default function RideDrawer({
                       disabled={!canApprove || busy}
                       onClick={() => {
                         setErr("");
-                        setIncentive(String((r as any)?.insentive_amount ?? "")); // optional prefill
+                        setIncentive(String((r as any)?.insentive_amount ?? ""));
                         setIncentiveOpen(true);
                       }}
                       className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
@@ -1272,9 +1373,7 @@ export default function RideDrawer({
                     <div className="text-sm font-extrabold text-slate-900">Assign Driver</div>
 
                     <div className="mt-4 flex items-center justify-between">
-                      <div className="text-xs font-semibold text-slate-600">
-                        Mode
-                      </div>
+                      <div className="text-xs font-semibold text-slate-600">Mode</div>
 
                       <button
                         type="button"
@@ -1316,7 +1415,6 @@ export default function RideDrawer({
                       </div>
                     )}
 
-
                     <div className="mt-4 flex gap-2">
                       <button
                         onClick={() => setAssignOpen(false)}
@@ -1331,7 +1429,6 @@ export default function RideDrawer({
                           (manualMode && (!manualName.trim() || !manualPhone.trim()))
                         }
                         onClick={doAssign}
-
                         className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                       >
                         Assign
@@ -1341,14 +1438,10 @@ export default function RideDrawer({
                 </div>
               ) : null}
 
-
               {/* ✅ Incentive modal (before approve) */}
               {incentiveOpen ? (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                  <button
-                    className="absolute inset-0 bg-black/30"
-                    onClick={() => setIncentiveOpen(false)}
-                  />
+                  <button className="absolute inset-0 bg-black/30" onClick={() => setIncentiveOpen(false)} />
                   <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-extrabold text-slate-900">Add Incentive</div>
@@ -1367,7 +1460,6 @@ export default function RideDrawer({
                       <input
                         value={incentive}
                         onChange={(e) => {
-                          // allow only numbers
                           const v = e.target.value.replace(/[^\d]/g, "");
                           setIncentive(v);
                         }}
@@ -1387,7 +1479,6 @@ export default function RideDrawer({
                           <span className="font-extrabold text-slate-900">{money(incentive || 0)}</span>
                         </div>
 
-                        {/* simple total */}
                         <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
                           <span className="text-xs font-semibold text-slate-500">Total shown to driver</span>
                           <span className="text-sm font-extrabold text-slate-900">
