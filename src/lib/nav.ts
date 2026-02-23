@@ -7,6 +7,7 @@ import {
   Settings,
   UserPlus,
   ClipboardPlus,
+  Download, // ✅ TA Export icon
 
   FileText,    // ✅ Invoices
 } from "lucide-react";
@@ -92,7 +93,14 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "opsteam", "b2bclient"],
   },
 
- 
+   // ================= TA EXPORT =================
+  {
+    key: "taExport",
+    label: "TA Export",
+    to: "/ops/rides/ta-export",
+    icon: Download, // ya FileDown
+    roles: ["admin", "opsteam"],
+  },
 
   // ================= USERS =================
   {

@@ -39,7 +39,17 @@ export type Ride = {
 };
 
 
+// src/lib/opsApi.ts (Ride type ke andar add)
+  // ✅ TA fields
+  TAFare?: number;
+  TADescription?: string;
 
+  // ✅ extra charge fields (update-fields)
+  actual_extended_time_duration?: number;
+  actual_extended_time_fare?: number;
+  waiting_duration?: number;
+  waiting_charge?: number;
+  extended_actual_distance_fare?: number;
  isEmergency?: boolean;
   EmergencyDescription?: string;
 
@@ -357,3 +367,23 @@ export async function opsDeleteRideImage(
 }
 
 
+// lib/opsApi.ts
+
+export async function opsUpdateRideTA(rideId: string, payload: {
+  TAFare?: number | string;
+  TADescription?: string;
+}) {
+  const { data } = await api.patch(`/ops/rides/${rideId}/update-ta`, payload);
+  return data;
+}
+
+export async function opsUpdateRideFields(rideId: string, payload: {
+  actual_extended_time_duration?: number | string;
+  actual_extended_time_fare?: number | string;
+  waiting_duration?: number | string;
+  waiting_charge?: number | string;
+  extended_actual_distance_fare?: number | string;
+}) {
+  const { data } = await api.patch(`/ops/rides/${rideId}/update-fields`, payload);
+  return data;
+}

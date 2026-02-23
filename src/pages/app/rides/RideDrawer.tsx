@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Star,
   MessageSquare,
+  FileDown, // ✅ add
+  ReceiptText, // ✅ add
 } from "lucide-react";
 import {
   opsGetRide,
@@ -23,10 +25,12 @@ import {
   opsAssignDriver,
   opsSubmitRideReview,
   opsUpdateEmergency,
-  opsDriverCoordinates, // ✅
+  opsDriverCoordinates,
   opsUpdateRideTimes,
   opsUploadRideMedia,
   opsDeleteRideImage,
+  opsUpdateRideFields, // ✅ add
+  opsUpdateRideTA, // ✅ add
   type Driver,
   type Ride,
 } from "../../../lib/opsApi";
@@ -192,6 +196,27 @@ function Recenter({ center }: { center: [number, number] }) {
   return null;
 }
 
+/* ----------------------------- CSV helpers ----------------------------- */
+function csvEscape(v: any) {
+  const s = String(v ?? "");
+  // double quotes escape
+  const t = s.replace(/"/g, '""');
+  // wrap in quotes always to be safe
+  return `"${t}"`;
+}
+
+function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
 /* ----------------------------- Component ----------------------------- */
 export default function RideDrawer({
   rideId,
@@ -242,17 +267,70 @@ export default function RideDrawer({
     car_handover_time: "",
   });
 
+  // ✅ TA modal
+  const [taOpen, setTaOpen] = useState(false);
+  const [taFare, setTaFare] = useState("");
+  const [taDesc, setTaDesc] = useState("");
+
+  // ✅ Extra Charges modal
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [extraForm, setExtraForm] = useState({
+    actual_extended_time_duration: "",
+    actual_extended_time_fare: "",
+    waiting_duration: "",
+    waiting_charge: "",
+    extended_actual_distance_fare: "",
+  });
+
   // ✅ LIVE driver location on map
   const [liveDriverLoc, setLiveDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
 
   // ✅ nearest drivers (pickup se)
   const [nearestDrivers, setNearestDrivers] = useState<
-    Array<{ driverId: string; lat: number; lng: number; kmFromPickup: number }>
+    Array<{
+      driverId: string;
+      lat: number;
+      lng: number;
+      kmFromPickup: number;
+      name?: string;
+      phone?: string;
+    }>
   >([]);
 
   const r: any = ride || {};
 
-  // ✅ coords (declare BEFORE hooks that use these in deps)
+  // ✅ driver lookup map (id -> {name, phone})
+  const driverInfoById = useMemo(() => {
+    const m = new Map<string, { name?: string; phone?: string }>();
+
+    // from available drivers list (opsAvailableDrivers)
+    for (const d of drivers || []) {
+      const id = String((d as any)._id || (d as any).id || (d as any).driverId || "");
+      if (!id) continue;
+
+      m.set(id, {
+        name: (d as any).name,
+        phone: (d as any).phoneNumber || (d as any).number || (d as any).phone,
+      });
+    }
+
+    // also from assigned driver object (if present)
+    if (r?.AssignedDriver) {
+      const id = String(
+        r.AssignedDriver.driverId || r.AssignedDriver._id || r.AssignedDriver.id || ""
+      );
+      if (id) {
+        m.set(id, {
+          name: r.AssignedDriver.name,
+          phone: r.AssignedDriver.number || r.AssignedDriver.phoneNumber,
+        });
+      }
+    }
+
+    return m;
+  }, [drivers, r?.AssignedDriver]);
+
+  // ✅ coords
   const pickupLat = r.pickup_latitude;
   const pickupLng = r.pickup_longitude;
   const dropLat = r.drop_latitude;
@@ -261,7 +339,7 @@ export default function RideDrawer({
   const pickupOk = isNum(pickupLat) && isNum(pickupLng);
   const dropOk = isNum(dropLat) && isNum(dropLng);
 
-  // ✅ assignedAt (declare before using in functions that run later)
+  // ✅ assignedAt
   const assignedAt =
     r.driver_assign_time ||
     r.driver_assigned_at ||
@@ -416,6 +494,11 @@ export default function RideDrawer({
     return s === "completed" || s === "complete";
   }, [ride]);
 
+  const isCompleted = useMemo(() => {
+    const s = String((ride as any)?.ride_status || "").toLowerCase();
+    return s === "completed" || s === "complete";
+  }, [ride]);
+
   const hasReview = useMemo(() => {
     const rr: any = ride || {};
     return !!rr.ops_review;
@@ -438,7 +521,7 @@ export default function RideDrawer({
     return r?.AssignedDriver?._id || r?.AssignedDriver?.id || r?.AssignedDriver?.driverId || null;
   }, [r?.AssignedDriver]);
 
-  // ✅ SOCKET: live driver location (hooks MUST run every render; guarded by open/rideId)
+  // ✅ SOCKET: live driver location
   useEffect(() => {
     if (!open || !rideId) return;
 
@@ -472,13 +555,13 @@ export default function RideDrawer({
     };
   }, [open, rideId, assignedDriverId]);
 
-  // ✅ Driver id for GPS polling (matches opsDriverCoordinates().coordinates[].driverId)
+  // ✅ Driver id for GPS polling
   const driverIdForGps = useMemo(() => {
     const v = r?.AssignedDriver?.driverId || null;
     return v ? String(v) : null;
   }, [r?.AssignedDriver]);
 
-  // ✅ FRONTEND-ONLY LIVE GPS + NEAREST DRIVERS: poll /ops/drivers/coordinates every 5s
+  // ✅ poll /ops/drivers/coordinates every 5s
   useEffect(() => {
     if (!open) return;
 
@@ -502,12 +585,19 @@ export default function RideDrawer({
           const pickup = { lat: pickupLat, lng: pickupLng };
 
           const list = coords
-            .filter(
-              (x: any) => typeof x?.lat === "number" && typeof x?.lng === "number" && x?.driverId
-            )
+            .filter((x: any) => typeof x?.lat === "number" && typeof x?.lng === "number" && x?.driverId)
             .map((x: any) => {
+              const id = String(x.driverId);
               const km = haversineKm(pickup, { lat: x.lat, lng: x.lng });
-              return { driverId: String(x.driverId), lat: x.lat, lng: x.lng, kmFromPickup: km };
+
+              return {
+                driverId: id,
+                lat: x.lat,
+                lng: x.lng,
+                kmFromPickup: km,
+                name: x.name || undefined,
+                phone: x.phoneNumber || x.phone || x.phone_number || undefined,
+              };
             })
             .sort((a: any, b: any) => a.kmFromPickup - b.kmFromPickup)
             .slice(0, 5);
@@ -517,7 +607,7 @@ export default function RideDrawer({
           setNearestDrivers([]);
         }
       } catch {
-        // optional
+        // ignore
       }
     }
 
@@ -527,7 +617,7 @@ export default function RideDrawer({
     return () => {
       if (t) clearInterval(t);
     };
-  }, [open, driverIdForGps, pickupOk, pickupLat, pickupLng]);
+  }, [open, driverIdForGps, pickupOk, pickupLat, pickupLng, driverInfoById]);
 
   // ✅ open review modal (prefill)
   function openReview() {
@@ -584,6 +674,118 @@ export default function RideDrawer({
     }
   }
 
+  // ✅ TA modal handlers
+  function openTAModal() {
+    const rr: any = ride || {};
+    setErr("");
+    setTaFare(String(rr?.TAFare ?? rr?.taFare ?? ""));
+    setTaDesc(String(rr?.TADescription ?? rr?.taDescription ?? ""));
+    setTaOpen(true);
+  }
+
+  async function saveTA() {
+    if (!rideId) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const payload: any = {
+        TAFare: Number(taFare || 0),
+        TADescription: String(taDesc || ""),
+      };
+      await opsUpdateRideTA(rideId, payload);
+      setTaOpen(false);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "TA update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ✅ Extra charges modal handlers
+  function openExtraModal() {
+    const rr: any = ride || {};
+    setErr("");
+    setExtraForm({
+      actual_extended_time_duration: String(rr?.actual_extended_time_duration ?? ""),
+      actual_extended_time_fare: String(rr?.actual_extended_time_fare ?? ""),
+      waiting_duration: String(rr?.waiting_duration ?? ""),
+      waiting_charge: String(rr?.waiting_charge ?? ""),
+      extended_actual_distance_fare: String(rr?.extended_actual_distance_fare ?? ""),
+    });
+    setExtraOpen(true);
+  }
+
+  async function saveExtraCharges() {
+    if (!rideId) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const toNumOrUndef = (s: string) => {
+        if (s === "" || s === null || s === undefined) return undefined;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : undefined;
+      };
+
+      const payload: any = {
+        actual_extended_time_duration: toNumOrUndef(extraForm.actual_extended_time_duration),
+        actual_extended_time_fare: toNumOrUndef(extraForm.actual_extended_time_fare),
+        waiting_duration: toNumOrUndef(extraForm.waiting_duration),
+        waiting_charge: toNumOrUndef(extraForm.waiting_charge),
+        extended_actual_distance_fare: toNumOrUndef(extraForm.extended_actual_distance_fare),
+      };
+
+      // remove all-undefined
+      Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+
+      await opsUpdateRideFields(rideId, payload);
+      setExtraOpen(false);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Extra charges update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ✅ CSV export for this ride (single row)
+  function exportRideCSV() {
+    const rr: any = ride || {};
+    const row = {
+      rideId: rr?._id || "",
+      status: rr?.ride_status || "",
+      date: rr?.end_ride_time || rr?.car_handover_time || rr?.createdAt || "",
+      scheduled_time: rr?.scheduled_time || "",
+      driver_name: rr?.AssignedDriver?.name || "",
+      driver_phone: rr?.AssignedDriver?.number || "",
+      car_no: rr?.car_details?.car_no || "",
+      pickup: rr?.pickup_location || "",
+      drop: rr?.drop_location || "",
+      base_fare: rr?.base_fare ?? "",
+      fare_estimation: rr?.fare_estimation ?? "",
+      total_fare: rr?.total_fare ?? "",
+      incentive_amount: rr?.insentive_amount ?? "",
+      TA_fare: rr?.TAFare ?? "",
+      TA_description: rr?.TADescription ?? "",
+      actual_extended_time_duration: rr?.actual_extended_time_duration ?? "",
+      actual_extended_time_fare: rr?.actual_extended_time_fare ?? "",
+      waiting_duration: rr?.waiting_duration ?? "",
+      waiting_charge: rr?.waiting_charge ?? "",
+      extended_actual_distance_fare: rr?.extended_actual_distance_fare ?? "",
+      start_images_count: Array.isArray(rr?.start_car_images) ? rr.start_car_images.length : 0,
+      end_images_count: Array.isArray(rr?.end_car_images) ? rr.end_car_images.length : 0,
+    };
+
+    const headers = Object.keys(row);
+    const values = headers.map((h) => csvEscape((row as any)[h]));
+    const csv = `${headers.map(csvEscape).join(",")}\n${values.join(",")}\n`;
+
+    const fname = `ride_${String(rr?._id || "export")}.csv`;
+    downloadTextFile(fname, csv);
+  }
+
   // ✅ IMPORTANT: early return AFTER all hooks
   if (!open) return null;
 
@@ -591,16 +793,16 @@ export default function RideDrawer({
   const startImgs: string[] = Array.isArray(r.start_car_images)
     ? r.start_car_images
     : Array.isArray(r.start_car_images_)
-      ? r.start_car_images_
-      : [];
+    ? r.start_car_images_
+    : [];
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
-  // meta (enums set at create time)
+  // meta
   const businessFunction = r.businessFunction ?? r.business_function ?? null;
   const tripCategory = r.tripCategory ?? r.trip_category ?? null;
   const businessCategory = r.businessCategory ?? r.business_category ?? null;
 
-  // POC (optional)
+  // POC
   const pickupPOC = r.pickupPOC ?? r.pickup_poc ?? null;
   const dropPOC = r.dropPOC ?? r.drop_poc ?? null;
 
@@ -644,8 +846,8 @@ export default function RideDrawer({
     liveDriverLoc
       ? [liveDriverLoc.lat, liveDriverLoc.lng]
       : pickupOk
-        ? [pickupLat, pickupLng]
-        : [28.6139, 77.209];
+      ? [pickupLat, pickupLng]
+      : [28.6139, 77.209];
 
   return (
     <div className="fixed inset-0 z-50">
@@ -687,7 +889,9 @@ export default function RideDrawer({
                   ? nearestDrivers.map((d) => (
                       <Marker key={d.driverId} icon={pinIcon} position={[d.lat, d.lng]}>
                         <Popup>
-                          Nearest Driver • {d.driverId}
+                          Nearest Driver
+                          <br />
+                          {d.name || "Unknown"} • {d.phone || "—"}
                           <br />
                           {d.kmFromPickup.toFixed(2)} km from pickup
                         </Popup>
@@ -729,7 +933,8 @@ export default function RideDrawer({
                   <div>Driver → Drop: {fmtKm(driverToDropKm)}</div>
                   {nearestDrivers[0] ? (
                     <div>
-                      Nearest: {nearestDrivers[0].driverId} • {fmtKm(nearestDrivers[0].kmFromPickup)}
+                      Nearest: {nearestDrivers[0].name || "Unknown"} • {nearestDrivers[0].phone || "—"} •{" "}
+                      {fmtKm(nearestDrivers[0].kmFromPickup)}
                     </div>
                   ) : null}
                 </div>
@@ -874,14 +1079,8 @@ export default function RideDrawer({
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field
-                    label="Pickup (lat, lng)"
-                    value={pickupOk ? `${pickupLat}, ${pickupLng}` : "—"}
-                  />
-                  <Field
-                    label="Drop (lat, lng)"
-                    value={dropOk ? `${dropLat}, ${dropLng}` : "—"}
-                  />
+                  <Field label="Pickup (lat, lng)" value={pickupOk ? `${pickupLat}, ${pickupLng}` : "—"} />
+                  <Field label="Drop (lat, lng)" value={dropOk ? `${dropLat}, ${dropLng}` : "—"} />
                 </div>
               </div>
 
@@ -897,7 +1096,9 @@ export default function RideDrawer({
                     label="Nearest Driver (from Pickup)"
                     value={
                       nearestDrivers.length
-                        ? `${fmtKm(nearestDrivers[0].kmFromPickup)} • ID: ${nearestDrivers[0].driverId}`
+                        ? `${fmtKm(nearestDrivers[0].kmFromPickup)} • ${nearestDrivers[0].name || "Unknown"} • ${
+                            nearestDrivers[0].phone || "—"
+                          }`
                         : "—"
                     }
                   />
@@ -910,7 +1111,7 @@ export default function RideDrawer({
                       {nearestDrivers.map((d, i) => (
                         <div key={d.driverId} className="flex items-center justify-between text-sm">
                           <div className="font-semibold text-slate-800">
-                            #{i + 1} • {d.driverId}
+                            #{i + 1} • {d.name || "Unknown"} • {d.phone || "—"}
                           </div>
                           <div className="font-semibold text-slate-900">{fmtKm(d.kmFromPickup)}</div>
                         </div>
@@ -985,15 +1186,9 @@ export default function RideDrawer({
                   <Field label="Arrived → Start" value={diffHrsMin(r.start_ride_time, r.driver_arrival_time)} />
                   <Field label="Arrived → End" value={diffHrsMin(r.end_ride_time, r.driver_arrival_time)} />
 
-                  <Field
-                    label="Start → End (Minus 90 mins)"
-                    value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)}
-                  />
+                  <Field label="Start → End (Minus 90 mins)" value={diffMinusMinutes(r.end_ride_time, r.start_ride_time, 90)} />
 
-                  <Field
-                    label="Estimated → Actual Arrival"
-                    value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)}
-                  />
+                  <Field label="Estimated → Actual Arrival" value={diffHrsMin(r.driver_arrival_time, r.scheduled_time)} />
                 </div>
               </div>
 
@@ -1123,19 +1318,86 @@ export default function RideDrawer({
 
               {/* Fare + estimations */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-                  <IndianRupee size={18} />
-                  Fare & Estimations
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                    <IndianRupee size={18} />
+                    Fare & Estimations
+                  </div>
+
+                  {/* ✅ quick export */}
+                  <button
+                    onClick={exportRideCSV}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50"
+                  >
+                    <FileDown size={16} />
+                    Export CSV
+                  </button>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Field label="Base Fare" value={money(r.base_fare)} />
                   <Field label="Fare Estimation" value={money(r.fare_estimation)} />
                   <Field label="Total Fare" value={money(r.total_fare)} />
-                  <Field label="Extended Time Fare" value={money(r.extended_time_fare)} />
+                  <Field label="Incentive" value={money(r.insentive_amount)} />
+
+                  <Field label="Extended Time Fare (estimate)" value={money(r.extended_time_fare)} />
+                  <Field label="Extended Time Duration (estimate)" value={num(r.extended_time_duration)} />
+
                   <Field label="Time Estimations (mins?)" value={num(r.time_estimations)} />
                   <Field label="Distance Estimation" value={num(r.distance_estimation)} />
-                  <Field label="Extended Time Duration" value={num(r.extended_time_duration)} />
+                </div>
+
+                {/* ✅ TA + Extra Charges (saved values) */}
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs font-semibold text-slate-600">Post-ride adjustments</div>
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    <Field label="TA Fare" value={money(r.TAFare)} />
+                    <Field label="TA Description" value={r.TADescription || "—"} />
+
+                    <Field label="Actual Extended Time (mins)" value={num(r.actual_extended_time_duration)} />
+                    <Field label="Actual Extended Time Fare" value={money(r.actual_extended_time_fare)} />
+
+                    <Field label="Waiting Duration (mins)" value={num(r.waiting_duration)} />
+                    <Field label="Waiting Charge" value={money(r.waiting_charge)} />
+
+                    <Field label="Extra Distance Fare" value={money(r.extended_actual_distance_fare)} />
+                    <Field
+                      label="Extra Total (sum)"
+                      value={money(
+                        Number(r.actual_extended_time_fare || 0) +
+                          Number(r.waiting_charge || 0) +
+                          Number(r.extended_actual_distance_fare || 0) +
+                          Number(r.TAFare || 0)
+                      )}
+                    />
+                  </div>
+
+                  {/* ✅ edit buttons only when completed */}
+                  {isCompleted ? (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={openTAModal}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        <ReceiptText size={16} />
+                        Update TA
+                      </button>
+
+                      <button
+                        disabled={busy}
+                        onClick={openExtraModal}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <ReceiptText size={16} />
+                        Update Extra Charges
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-xs text-slate-500">
+                      TA / Extra charges can be updated only after ride is completed.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1362,6 +1624,37 @@ export default function RideDrawer({
                       {hasReview ? "Edit Ops Review" : "Add Ops Review"}
                     </button>
                   ) : null}
+
+                  {/* ✅ quick post-ride actions */}
+                  {isCompleted ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={openTAModal}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        <ReceiptText size={18} />
+                        TA
+                      </button>
+
+                      <button
+                        disabled={busy}
+                        onClick={openExtraModal}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <ReceiptText size={18} />
+                        Extra
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <button
+                    onClick={exportRideCSV}
+                    className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                  >
+                    <FileDown size={18} />
+                    Export this ride CSV
+                  </button>
                 </div>
               </div>
 
@@ -1438,17 +1731,14 @@ export default function RideDrawer({
                 </div>
               ) : null}
 
-              {/* ✅ Incentive modal (before approve) */}
+              {/* ✅ Incentive modal */}
               {incentiveOpen ? (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
                   <button className="absolute inset-0 bg-black/30" onClick={() => setIncentiveOpen(false)} />
                   <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-extrabold text-slate-900">Add Incentive</div>
-                      <button
-                        onClick={() => setIncentiveOpen(false)}
-                        className="rounded-xl p-2 hover:bg-slate-100"
-                      >
+                      <button onClick={() => setIncentiveOpen(false)} className="rounded-xl p-2 hover:bg-slate-100">
                         <X size={18} />
                       </button>
                     </div>
@@ -1600,6 +1890,183 @@ export default function RideDrawer({
                       <button
                         disabled={busy}
                         onClick={submitEmergency}
+                        className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* ✅ TA Modal */}
+              {taOpen ? (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                  <button className="absolute inset-0 bg-black/30" onClick={() => setTaOpen(false)} />
+                  <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-extrabold text-slate-900">Update TA</div>
+                      <button onClick={() => setTaOpen(false)} className="rounded-xl p-2 hover:bg-slate-100">
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        TA Fare (₹)
+                        <input
+                          value={taFare}
+                          onChange={(e) => setTaFare(e.target.value.replace(/[^\d]/g, ""))}
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <label className="block text-xs font-semibold text-slate-600">
+                        TA Description
+                        <textarea
+                          value={taDesc}
+                          onChange={(e) => setTaDesc(e.target.value)}
+                          placeholder="e.g. Toll / Parking / TA details..."
+                          className="mt-2 min-h-[100px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => setTaOpen(false)}
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={saveTA}
+                        className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save TA
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* ✅ Extra Charges Modal */}
+              {extraOpen ? (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                  <button className="absolute inset-0 bg-black/30" onClick={() => setExtraOpen(false)} />
+                  <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-extrabold text-slate-900">Update Extra Charges</div>
+                      <button onClick={() => setExtraOpen(false)} className="rounded-xl p-2 hover:bg-slate-100">
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Actual Extended Time Duration (mins)
+                        <input
+                          value={extraForm.actual_extended_time_duration}
+                          onChange={(e) =>
+                            setExtraForm((p) => ({
+                              ...p,
+                              actual_extended_time_duration: e.target.value.replace(/[^\d]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Actual Extended Time Fare (₹)
+                        <input
+                          value={extraForm.actual_extended_time_fare}
+                          onChange={(e) =>
+                            setExtraForm((p) => ({
+                              ...p,
+                              actual_extended_time_fare: e.target.value.replace(/[^\d]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Waiting Duration (mins)
+                        <input
+                          value={extraForm.waiting_duration}
+                          onChange={(e) =>
+                            setExtraForm((p) => ({
+                              ...p,
+                              waiting_duration: e.target.value.replace(/[^\d]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Waiting Charge (₹)
+                        <input
+                          value={extraForm.waiting_charge}
+                          onChange={(e) =>
+                            setExtraForm((p) => ({
+                              ...p,
+                              waiting_charge: e.target.value.replace(/[^\d]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Extra Distance Fare (₹)
+                        <input
+                          value={extraForm.extended_actual_distance_fare}
+                          onChange={(e) =>
+                            setExtraForm((p) => ({
+                              ...p,
+                              extended_actual_distance_fare: e.target.value.replace(/[^\d]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                      </label>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Sum</span>
+                          <span className="font-extrabold text-slate-900">
+                            {money(
+                              Number(extraForm.actual_extended_time_fare || 0) +
+                                Number(extraForm.waiting_charge || 0) +
+                                Number(extraForm.extended_actual_distance_fare || 0)
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Backend will add fares to total_fare as per your controller logic.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => setExtraOpen(false)}
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={saveExtraCharges}
                         className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                       >
                         Save

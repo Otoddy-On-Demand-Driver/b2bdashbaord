@@ -8,7 +8,8 @@ import RoleGate from "./components/ui/RoleGate";
 
 import LoginPage from "./pages/auth/LoginPage";
 import Forbidden from "./pages/Forbidden";
-
+// App.tsx (top imports ke paas)
+import TAExportPage from "./pages/TAExportPage";
 import AppShell from "./layouts/AppShell";
 import DashboardHome from "./pages/app/DashboardHome";
 import RidesPage from "./pages/app/RidesPage";
@@ -58,6 +59,7 @@ export default function App() {
             <Route element={<RoleGate allow={["admin", "opsteam","b2bclient"]} />}>
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceView />} />
+
             </Route>
 
             {/* Role-based: admin + opsteam */}
@@ -65,6 +67,8 @@ export default function App() {
               <Route path="drivers" element={<DriversPage />} />
               <Route path="map" element={<MapPage />} />
               <Route path="settings" element={<SettingsPage />} />
+                              <Route path="ops/rides/ta-export" element={<TAExportPage />} />
+
             </Route>
 
             {/* Role-based: admin only */}
