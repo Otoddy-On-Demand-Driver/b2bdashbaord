@@ -90,7 +90,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Invoices",
     to: "/invoices",
     icon: FileText,
-    roles: ["admin", "opsteam", "b2bclient"],
+    roles: ["admin",  "b2bclient"],
   },
 
    // ================= TA EXPORT =================
