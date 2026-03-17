@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   listInvoices,
   generateMonthlyInvoice,
-  generatePeriodInvoice, // ✅ add
+  generatePeriodInvoice,
   openInvoicePdf,
   INVOICE_TYPES,
   INVOICE_STATUSES,
@@ -13,6 +13,14 @@ import {
   type InvoiceStatus,
 } from "../../lib/invoicesApi";
 import { apiErrorMessage } from "../../lib/api";
+
+// ✅ rides APIs (adjust path if needed)
+import {
+  opsUpcomingRides,
+  opsOngoingRides,
+  opsCompletedRides,
+  type Ride,
+} from "../../lib/opsApi";
 
 const inr = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
@@ -30,6 +38,78 @@ function toDateInputValue(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/* ---------------- CSV helpers ---------------- */
+function csvEscape(v: any) {
+  const s = String(v ?? "");
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function downloadCSV(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 800);
+}
+
+// NOTE: These field names must exist in Ride returned by your APIs.
+// If your backend uses different names, update here:
+// - business_function / trip_category
+function ridesToCSV(rides: Ride[]) {
+  const headers = [
+    "Ride ID",
+    "Pickup",
+    "Drop",
+    "Distance (km)",
+    "Base Fare",
+    "Extended Fare",
+    "Total Fare",
+    "Business Function",
+    "Trip Category",
+  ];
+
+  const lines: string[] = [];
+  lines.push(headers.map(csvEscape).join(","));
+
+  for (const r of rides || []) {
+
+    
+    const realExtendedFare =( r.extended_actual_distance_fare || 0 ) > ( r.extended_distance_fare || 0) ? ( r.extended_actual_distance_fare || 0) : (r.extended_distance_fare || 0);
+
+    const extendedFare =
+      (realExtendedFare || 0) +
+      (r.actual_extended_time_fare || 0) +
+      (r.waiting_charge || 0);
+
+    // @ts-ignore (in case Ride type doesn't include these yet)
+    const businessFunction = (r as any).business_function ?? (r as any).businessFunction ?? "";
+    // @ts-ignore
+    const tripCategory = (r as any).trip_category ?? (r as any).tripCategory ?? "";
+
+    lines.push(
+      [
+        r._id,
+        r.pickup_location,
+        r.drop_location,
+        r.distance_estimation,//actual
+        r.fare_estimation,
+        extendedFare,
+        r.total_fare,
+        businessFunction,
+        tripCategory,
+      ]
+        .map(csvEscape)
+        .join(",")
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export default function InvoicesPage() {
   const nav = useNavigate();
 
@@ -45,7 +125,7 @@ export default function InvoicesPage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [q, setQ] = useState("");
 
-  // ✅ date range for period invoice
+  // date range (used for period invoice + optional CSV filter)
   const today = new Date();
   const [fromDate, setFromDate] = useState<string>(toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [toDate, setToDate] = useState<string>(toDateInputValue(today));
@@ -82,17 +162,18 @@ export default function InvoicesPage() {
 
   async function onGenerateMonthly() {
     try {
+      setLoading(true);
+      setError("");
+
       const cid = companyId.trim() || undefined;
-const m = month === "" ? new Date().getMonth() + 1 : month;
-const y = Number.isFinite(year) ? year : new Date().getFullYear();
+      const m = month === "" ? new Date().getMonth() + 1 : month;
+      const y = Number.isFinite(year) ? year : new Date().getFullYear();
 
-const inv = await generateMonthlyInvoice({
-  companyId: cid,   // ✅ optional
-  month: m,
-  year: y,
-});
-
-
+      const inv = await generateMonthlyInvoice({
+        companyId: cid,
+        month: m,
+        year: y,
+      });
 
       nav(`/invoices/${inv._id}`);
     } catch (e) {
@@ -102,38 +183,97 @@ const inv = await generateMonthlyInvoice({
     }
   }
 
-  // ✅ NEW: Generate Period (From-To) single invoice
   async function onGeneratePeriod() {
-  try {
-    const cid = companyId.trim() || undefined;
+    try {
+      const cid = companyId.trim() || undefined;
 
-    if (!fromDate || !toDate) {
-      setError("Select From date and To date.");
-      return;
+      if (!fromDate || !toDate) {
+        setError("Select From date and To date.");
+        return;
+      }
+      if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
+        setError("From date must be <= To date.");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      const inv = await generatePeriodInvoice({
+        companyId: cid,
+        startDate: fromDate,
+        endDate: toDate,
+      });
+
+      nav(`/invoices/${inv._id}`);
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setLoading(false);
     }
-
-    if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
-      setError("From date must be <= To date.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    const inv = await generatePeriodInvoice({
-      companyId: cid,        // ✅ optional
-      startDate: fromDate,
-      endDate: toDate,
-    });
-
-    nav(`/invoices/${inv._id}`);
-  } catch (e) {
-    setError(apiErrorMessage(e));
-  } finally {
-    setLoading(false);
   }
-}
 
+  // ✅ Export rides from frontend data (NO CANCELLED)
+  async function onExportRidesCSV_NoCancelled() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const [up, on, co] = await Promise.all([
+        opsUpcomingRides(),
+        opsOngoingRides(),
+        opsCompletedRides(),
+      ]);
+
+      const all: Ride[] = [
+        ...(up?.upcomingRides || []),
+        ...(on?.ongoingRides || []),
+        ...(co?.completedRides || []),
+      ];
+
+      // ✅ Remove cancelled rides (extra safety)
+      const withoutCancelled = all.filter(
+        (r) =>
+          r.ride_status !== "cancelled by b2b client" &&
+          r.ride_status !== "cancelled by admin"
+      );
+
+      // ✅ de-duplicate by _id
+      const map = new Map<string, Ride>();
+      for (const r of withoutCancelled) map.set(r._id, r);
+      const unique = Array.from(map.values());
+
+      // ✅ optional: sort latest first
+      unique.sort((a: any, b: any) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+
+      // ✅ optional: date-range filter by createdAt (client-side)
+      const fromT = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
+      const toT = toDate ? new Date(toDate + "T23:59:59").getTime() : null;
+
+      const final = unique.filter((r: any) => {
+        if (!fromT && !toT) return true;
+        const t = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+        if (fromT && t < fromT) return false;
+        if (toT && t > toT) return false;
+        return true;
+      });
+
+      const csv = ridesToCSV(final);
+      const filename = `rides_export_${fromDate || ""}_${toDate || ""}_${new Date().toISOString().slice(0, 10)}.csv`
+        .replace(/__+/g, "_")
+        .replace(/_+\.csv$/, ".csv");
+
+      downloadCSV(filename, csv);
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -168,7 +308,7 @@ const inv = await generateMonthlyInvoice({
     const count = filtered.length;
     const monthlyCount = filtered.filter((x) => x.type === "monthly").length;
     const rideCount = filtered.filter((x) => x.type === "ride").length;
-    const periodCount = filtered.filter((x) => x.type === "period").length; // ✅
+    const periodCount = filtered.filter((x) => x.type === "period").length;
     return { total, count, monthlyCount, rideCount, periodCount };
   }, [filtered]);
 
@@ -177,7 +317,9 @@ const inv = await generateMonthlyInvoice({
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Invoices</h1>
-          <div className="text-sm text-gray-600 mt-1">Filter + monthly/period invoice + PDF export</div>
+          <div className="text-sm text-gray-600 mt-1">
+            Filter + monthly/period invoice + PDF export + rides CSV export
+          </div>
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -189,6 +331,16 @@ const inv = await generateMonthlyInvoice({
             Refresh
           </button>
 
+          {/* ✅ Rides CSV export (NO cancelled) */}
+          <button
+            className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
+            onClick={onExportRidesCSV_NoCancelled}
+            disabled={loading}
+            title="Exports rides from upcoming/ongoing/completed (cancelled excluded)"
+          >
+            Export Rides CSV
+          </button>
+
           <button
             className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
             disabled={!companyId.trim() || loading || month === ""}
@@ -198,10 +350,9 @@ const inv = await generateMonthlyInvoice({
             Generate Monthly Invoice
           </button>
 
-          {/* ✅ NEW */}
           <button
             className="border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-60"
-disabled={loading || !fromDate || !toDate}
+            disabled={loading || !fromDate || !toDate}
             onClick={onGeneratePeriod}
             title={!companyId.trim() ? "Enter Company ID first" : ""}
           >
@@ -252,29 +403,25 @@ disabled={loading || !fromDate || !toDate}
           ))}
         </select>
 
-        <input type="number" className="border rounded px-3 py-2" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+        <input
+          type="number"
+          className="border rounded px-3 py-2"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        />
       </div>
 
-      {/* ✅ NEW: Period date range UI */}
+      {/* Period date range UI */}
       <div className="grid md:grid-cols-6 gap-3 mt-3 border p-3 rounded-xl">
-        <div className="md:col-span-2 text-sm text-gray-700 flex items-center font-medium">Period Invoice (From–To)</div>
+        <div className="md:col-span-2 text-sm text-gray-700 flex items-center font-medium">
+          Period Invoice (From–To)
+        </div>
 
-        <input
-          type="date"
-          className="border rounded px-3 py-2"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-        />
-
-        <input
-          type="date"
-          className="border rounded px-3 py-2"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-        />
+        <input type="date" className="border rounded px-3 py-2" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <input type="date" className="border rounded px-3 py-2" value={toDate} onChange={(e) => setToDate(e.target.value)} />
 
         <div className="md:col-span-2 text-xs text-gray-500 flex items-center">
-          Generates one single invoice for selected date range.
+          Date range is used for Period invoice + optional ride export filtering by <b>createdAt</b>.
         </div>
       </div>
 

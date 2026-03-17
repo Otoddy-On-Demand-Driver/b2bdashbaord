@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Overview",
     to: "/",
     icon: LayoutDashboard,
-    roles: ["admin", "opsteam", "b2bclient"],
+    roles: ["admin",  "b2bclient"],
   },
 
   // ================= RIDES =================

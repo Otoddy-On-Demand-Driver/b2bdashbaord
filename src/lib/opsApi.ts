@@ -47,6 +47,7 @@ export type Ride = {
   // ✅ extra charge fields (update-fields)
   actual_extended_time_duration?: number;
   actual_extended_time_fare?: number;
+  extended_distance_fare?: number;   // ✅ add this
   waiting_duration?: number;
   waiting_charge?: number;
   extended_actual_distance_fare?: number;
