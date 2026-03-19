@@ -136,8 +136,11 @@ export async function b2bFetchDriverLocation(driverId: string) {
 
 export async function b2bCancelRide(rideId: string, description: string) {
   const { data } = await b2bApi.post(`/b2bclient/cancel-ride/${rideId}`, {
-    CancellationDescription: description, // backend me schema field
+    description: description, // ✅ correct key
   });
+
+  return data;
+
 
   return data as { ok: boolean; ride: Ride; message?: string };
 }
