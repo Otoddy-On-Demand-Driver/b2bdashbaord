@@ -159,10 +159,13 @@ export default function TARidesExportPage() {
   const [rides, setRides] = useState<Ride[]>([]);
 
   // filters
-  const [mode, setMode] = useState<Mode>("ALL_EXTRA"); // ✅ 3 modes
+  const [mode, setMode] = useState<Mode>("ALL_EXTRA");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const [q, setQ] = useState<string>("");
+
+  // NEW: custom invoice amount
+  const [customInvoiceAmount, setCustomInvoiceAmount] = useState<string>("");
 
   async function load() {
     setErr("");
@@ -184,7 +187,6 @@ export default function TARidesExportPage() {
   const filtered = useMemo(() => {
     let list = rides.slice();
 
-    // ✅ mode filter
     if (mode === "ALL_EXTRA") list = list.filter(hasAnyExtra);
     if (mode === "TA_ONLY") list = list.filter(hasTAOnly);
     if (mode === "EXTEND_ONLY") list = list.filter(hasExtendOnly);
@@ -214,7 +216,6 @@ export default function TARidesExportPage() {
       });
     }
 
-    // newest first by end time
     list.sort((a, b) => {
       const ta = new Date(getRideEndTime(a) || 0).getTime();
       const tb = new Date(getRideEndTime(b) || 0).getTime();
@@ -224,6 +225,24 @@ export default function TARidesExportPage() {
     return list;
   }, [rides, mode, fromDate, toDate, q]);
 
+  const totals = useMemo(() => {
+    return filtered.reduce(
+      (acc, r) => {
+        acc.ta += getTA(r);
+        acc.extra += getExtra(r);
+        acc.totalFare += Number((r as any).total_fare || 0);
+        return acc;
+      },
+      { ta: 0, extra: 0, totalFare: 0 }
+    );
+  }, [filtered]);
+
+  const suggestedInvoiceAmount = useMemo(() => {
+    if (mode === "TA_ONLY") return totals.ta;
+    if (mode === "EXTEND_ONLY") return totals.extra;
+    return totals.ta + totals.extra;
+  }, [mode, totals]);
+
   function exportCSV(rows: Ride[]) {
     if (!rows.length) return;
 
@@ -231,8 +250,8 @@ export default function TARidesExportPage() {
       mode === "TA_ONLY"
         ? rows.map(toRowTAOnly)
         : mode === "EXTEND_ONLY"
-        ? rows.map(toRowExtendOnly)
-        : rows.map(toRowAll);
+          ? rows.map(toRowExtendOnly)
+          : rows.map(toRowAll);
 
     const headers = Object.keys(objects[0] || { rideId: "" });
     const csv =
@@ -247,13 +266,87 @@ export default function TARidesExportPage() {
     downloadCSV(`rides_${tag}_${fromDate || "all"}_${toDate || "all"}.csv`, csv);
   }
 
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+async function downloadTaInvoicePdf() {
+  try {
+    setErr("");
+
+    const enteredAmount = Number(customInvoiceAmount || 0);
+
+    if (!enteredAmount || enteredAmount <= 0) {
+      setErr("Please enter a valid invoice amount.");
+      return;
+    }
+
+    setBusyExport(true);
+
+    const payload: any = {
+      customAmount: enteredAmount,
+      mode,
+    };
+
+    // date optional hai, diya to backend me show hoga
+    if (fromDate) payload.startDate = fromDate;
+    if (toDate) payload.endDate = toDate;
+
+    const res = await fetch(`${API_BASE}invoices/ta/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data?.invoice?._id) {
+      throw new Error(data?.error || "Failed to generate invoice");
+    }
+
+    const pdfRes = await fetch(`${API_BASE}invoices/${data.invoice._id}/pdf`);
+
+    if (!pdfRes.ok) {
+      let message = "Failed to download invoice PDF";
+      try {
+        const pdfErr = await pdfRes.json();
+        message = pdfErr?.error || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    const blob = await pdfRes.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+
+    const tag =
+      mode === "TA_ONLY"
+        ? "ta"
+        : mode === "EXTEND_ONLY"
+          ? "extend"
+          : "ta-extra";
+
+    a.download = `${tag}-invoice.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e: any) {
+    setErr(apiErrorMessage(e, "Failed to generate invoice PDF"));
+  } finally {
+    setBusyExport(false);
+  }
+}
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xl font-extrabold text-slate-900">TA / Extra Rides Export</div>
           <div className="text-sm text-slate-500">
-            Completed rides me se TA / extra charges ke basis par filter karke CSV export.
+            Completed rides me se TA / extra charges ke basis par filter karke CSV export ya invoice PDF
+            download karo.
           </div>
         </div>
 
@@ -262,7 +355,7 @@ export default function TARidesExportPage() {
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           Refresh
         </button>
       </div>
@@ -273,8 +366,7 @@ export default function TARidesExportPage() {
         </div>
       ) : null}
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 space-y-3">
-        {/* ✅ Mode tabs */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 space-y-4">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -334,6 +426,19 @@ export default function TARidesExportPage() {
             />
           </label>
 
+          <label className="text-xs font-semibold text-slate-600">
+            Invoice Amount
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={customInvoiceAmount}
+              onChange={(e) => setCustomInvoiceAmount(e.target.value)}
+              placeholder={`Suggested: ${Math.round(suggestedInvoiceAmount || 0)}`}
+              className="mt-2 h-11 w-[210px] rounded-2xl border border-slate-200 px-3 text-sm"
+            />
+          </label>
+
           <label className="text-xs font-semibold text-slate-600 flex-1 min-w-[260px]">
             Search
             <div className="mt-2 relative">
@@ -348,6 +453,30 @@ export default function TARidesExportPage() {
           </label>
         </div>
 
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rides</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">{filtered.length}</div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">TA Total</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">{money(totals.ta)}</div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Extra Total</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">{money(totals.extra)}</div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Suggested Invoice</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">
+              {money(suggestedInvoiceAmount)}
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm font-semibold text-slate-700">
             Showing:{" "}
@@ -356,21 +485,32 @@ export default function TARidesExportPage() {
             </span>
           </div>
 
-          <button
-            disabled={busyExport || filtered.length === 0}
-            onClick={() => {
-              setBusyExport(true);
-              try {
-                exportCSV(filtered);
-              } finally {
-                setBusyExport(false);
-              }
-            }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            <FileDown size={16} />
-            Export CSV ({filtered.length})
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled={busyExport || filtered.length === 0}
+              onClick={() => {
+                setBusyExport(true);
+                try {
+                  exportCSV(filtered);
+                } finally {
+                  setBusyExport(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              <FileDown size={16} />
+              Export CSV ({filtered.length})
+            </button>
+
+            <button
+              disabled={busyExport || filtered.length === 0}
+              onClick={downloadTaInvoicePdf}
+              className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              <FileDown size={16} />
+              Download Invoice PDF
+            </button>
+          </div>
         </div>
       </div>
 
@@ -389,11 +529,8 @@ export default function TARidesExportPage() {
                 <tr className="text-left">
                   <th className="px-4 py-2">Ride</th>
                   <th className="px-4 py-2">Driver</th>
-
-                  {/* ✅ columns change by mode */}
                   {mode !== "EXTEND_ONLY" ? <th className="px-4 py-2">TA</th> : null}
                   {mode !== "TA_ONLY" ? <th className="px-4 py-2">Extra</th> : null}
-
                   <th className="px-4 py-2">Total Fare</th>
                   <th className="px-4 py-2">End Time</th>
                 </tr>

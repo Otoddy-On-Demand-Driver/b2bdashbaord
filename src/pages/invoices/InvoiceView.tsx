@@ -11,7 +11,9 @@ import {
 import { apiErrorMessage } from "../../lib/api";
 
 const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
+    Number(n || 0)
+  );
 
 function fmtDate(v?: string) {
   if (!v) return "-";
@@ -61,9 +63,12 @@ export default function InvoiceView() {
     const taxTotal = Number(invoice?.taxTotal || 0);
     const grandTotal = Number(invoice?.grandTotal || 0);
 
-    const calcSubtotal = invoice?.items?.reduce((sum, it) => sum + Number(it.amount || 0), 0) ?? 0;
-    const calcTax = invoice?.items?.reduce((sum, it) => sum + Number(it.taxAmount || 0), 0) ?? 0;
-    const calcTotal = invoice?.items?.reduce((sum, it) => sum + Number(it.total || 0), 0) ?? 0;
+    const calcSubtotal =
+      invoice?.items?.reduce((sum, it) => sum + Number(it.amount || 0), 0) ?? 0;
+    const calcTax =
+      invoice?.items?.reduce((sum, it) => sum + Number(it.taxAmount || 0), 0) ?? 0;
+    const calcTotal =
+      invoice?.items?.reduce((sum, it) => sum + Number(it.total || 0), 0) ?? 0;
 
     return {
       subtotal: subtotal || calcSubtotal,
@@ -112,7 +117,8 @@ export default function InvoiceView() {
             {invoice.periodStart || invoice.periodEnd ? (
               <>
                 {" "}
-                • Period: <b>{fmtDate(invoice.periodStart)}</b> → <b>{fmtDate(invoice.periodEnd)}</b>
+                • Period: <b>{fmtDate(invoice.periodStart)}</b> →{" "}
+                <b>{fmtDate(invoice.periodEnd)}</b>
               </>
             ) : null}
           </div>
@@ -150,6 +156,32 @@ export default function InvoiceView() {
               <tr key={`${it.refType}-${it.refId}-${i}`} className="border-t">
                 <td className="p-2 align-top">
                   <div className="font-medium">{it.description}</div>
+
+                  {it.meta?.fareBreakup ? (
+                    <div className="mt-1 text-xs text-gray-600 space-y-1">
+                      <div>
+                        Ride Fare:{" "}
+                        <b>{inr(Number(it.meta.fareBreakup.rideFare || 0))}</b>
+                      </div>
+
+                      {Number(it.meta?.waiting?.waitingCharge || 0) > 0 ? (
+                        <div>
+                          Waiting Charge:{" "}
+                          <b>{inr(Number(it.meta.waiting.waitingCharge || 0))}</b>
+                          <span className="text-gray-500">
+                            {" "}
+                            ({Number(it.meta.waiting.waitingMinutes || 0)} min, free{" "}
+                            {Number(it.meta.waiting.freeMinutes || 20)} min, blocks{" "}
+                            {Number(it.meta.waiting.extraBlocks || 0)})
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          Waiting Charge: <b>{inr(0)}</b>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
 
                   {it.meta ? (
                     <details className="mt-1">
