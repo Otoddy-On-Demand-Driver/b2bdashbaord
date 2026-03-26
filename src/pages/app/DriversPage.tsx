@@ -49,7 +49,7 @@ export default function DriversPage() {
   const [loading, setLoading] = useState(false);
 
   const [activeId, setActiveId] = useState<string | null>(null);
-
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("verification");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
@@ -366,15 +366,16 @@ export default function DriversPage() {
 
       {/* Table */}
       <div className="mt-5 rounded-3xl border border-slate-200 bg-white overflow-hidden">
-        <div className="grid grid-cols-12 gap-3 px-5 py-3 text-xs font-semibold text-slate-500 border-b border-slate-200">
-          <div className="col-span-4">Driver</div>
-          <div className="col-span-2">Online</div>
-          <div className="col-span-2">Verified</div>
-          <div className="col-span-2">Approval</div>
-          <div className="col-span-2 text-right">
-            {tab === "verification" ? "Verification" : "Action"}
-          </div>
-        </div>
+        <div className="grid grid-cols-14 gap-3 px-5 py-3 text-xs font-semibold text-slate-500 border-b border-slate-200">
+  <div className="col-span-4">Driver</div>
+  <div className="col-span-2">Online</div>
+  <div className="col-span-2">Verified</div>
+  <div className="col-span-2">Approval</div>
+  <div className="col-span-2">Documents</div>
+  <div className="col-span-2 text-right">
+    {tab === "verification" ? "Verification" : "Action"}
+  </div>
+</div>
 
         {loading ? (
           <div className="p-5 text-sm text-slate-600">Loading...</div>
@@ -395,7 +396,7 @@ export default function DriversPage() {
             return (
               <div
                 key={String(d._id)}
-                className="grid grid-cols-12 gap-3 px-5 py-4 border-b border-slate-100 hover:bg-slate-50"
+                className="grid grid-cols-14 gap-3 px-5 py-4 border-b border-slate-100 hover:bg-slate-50"
               >
                 <div className="col-span-4">
                   <div className="flex items-center gap-2">
@@ -431,6 +432,31 @@ export default function DriversPage() {
                     {d.isApproved ? "Approved" : "Needs approval"}
                   </Chip>
                 </div>
+                <div className="col-span-2 flex flex-col gap-1 text-xs">
+  {d.aadharCardImage ? (
+    <button
+      type="button"
+      onClick={() => setPreviewImage(d.aadharCardImage)}
+      className="text-left text-blue-600 underline"
+    >
+      Aadhaar
+    </button>
+  ) : (
+    <span className="text-slate-400">No Aadhaar</span>
+  )}
+
+  {d.drivingLicenseImage ? (
+    <button
+      type="button"
+      onClick={() => setPreviewImage(d.drivingLicenseImage)}
+      className="text-left text-blue-600 underline"
+    >
+      License
+    </button>
+  ) : (
+    <span className="text-slate-400">No License</span>
+  )}
+</div>
 
                 <div className="col-span-2 flex justify-end gap-2">
                   {!d.isApproved ? (
@@ -499,6 +525,27 @@ export default function DriversPage() {
         onClose={() => setActiveId(null)}
         onMutated={() => load(tab)}
       />
+{previewImage ? (
+<div
+  className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+  onClick={() => setPreviewImage(null)}
+>    <div className="relative max-h-[90vh] w-full max-w-3xl rounded-2xl bg-white p-3">
+      <button
+        type="button"
+        onClick={() => setPreviewImage(null)}
+        className="absolute right-3 top-3 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-800"
+      >
+        Close
+      </button>
+
+      <img
+        src={previewImage}
+        alt="Document Preview"
+        className="max-h-[80vh] w-full rounded-xl object-contain"
+      />
+    </div>
+  </div>
+) : null}
 
       {/* Confirm Modal */}
       {confirm ? (
