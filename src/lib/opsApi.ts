@@ -2,14 +2,16 @@ import { api } from "./api";
 
 export type RideStatus =
   | "completed"
-  | "cancelled by b2b client"
-  | "cancelled by admin"
   | "ongoing"
   | "driver arrived"
   | "car handed over"
   | "waiting for approval"
   | "approved"
-  | "driver assigned";
+  | "driver assigned"
+  | "cancelled by admin"
+  | "cancelled by b2b client"
+  | "cancelled by driver"
+  | "cancelled before driver arrival";
 
 export type Ride = {
   _id: string;
