@@ -390,3 +390,8 @@ export async function opsUpdateRideFields(rideId: string, payload: {
   const { data } = await api.patch(`/ops/rides/${rideId}/update-fields`, payload);
   return data;
 }
+
+export async function opsUpdateRideStatus(rideId: string, payload: any) {
+  const { data } = await api.patch(`/ops/rides/${rideId}/update-status`, payload);
+  return data;
+}

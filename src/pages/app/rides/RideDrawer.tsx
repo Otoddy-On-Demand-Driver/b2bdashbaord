@@ -30,7 +30,8 @@ import {
   opsUploadRideMedia,
   opsDeleteRideImage,
   opsUpdateRideFields, // ✅ add
-  opsUpdateRideTA, // ✅ add
+  opsUpdateRideTA,
+  opsUpdateRideStatus, // ✅ add
   type Driver,
   type Ride,
 } from "../../../lib/opsApi";
@@ -298,7 +299,7 @@ export default function RideDrawer({
   >([]);
 
   const r: any = ride || {};
-
+const normalizedStatus = String(r?.ride_status || "").toLowerCase();
   // ✅ driver lookup map (id -> {name, phone})
   const driverInfoById = useMemo(() => {
     const m = new Map<string, { name?: string; phone?: string }>();
@@ -483,6 +484,62 @@ export default function RideDrawer({
       setBusy(false);
     }
   }
+
+async function markArrived() {
+  if (!rideId) return;
+  if (!confirm("Driver arrived mark karne ke baad cancellation pe penalty lag sakti hai. Continue?")) return;
+
+  setBusy(true);
+  setErr("");
+  try {
+    await opsUpdateRideStatus(rideId, {
+      status: "driver_arrived",
+    });
+    await load();
+    onMutated();
+  } catch (e: any) {
+    setErr(apiErrorMessage(e, "Failed to mark arrived"));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function startRide() {
+  if (!rideId) return;
+
+  setBusy(true);
+  setErr("");
+  try {
+    await opsUpdateRideStatus(rideId, {
+      status: "ongoing",
+    });
+    await load();
+    onMutated();
+  } catch (e: any) {
+    setErr(apiErrorMessage(e, "Failed to start ride"));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function completeRide() {
+  if (!rideId) return;
+
+  setBusy(true);
+  setErr("");
+  try {
+    await opsUpdateRideStatus(rideId, {
+      status: "completed",
+    });
+    await load();
+    onMutated();
+  } catch (e: any) {
+    setErr(apiErrorMessage(e, "Failed to complete ride"));
+  } finally {
+    setBusy(false);
+  }
+}
+
 
   const canApprove = useMemo(
     () => ride?.ride_status === "waiting for approval",
@@ -1034,7 +1091,47 @@ export default function RideDrawer({
                     </div>
                   </div>
                 </div>
+<div className="flex flex-wrap gap-2">
+  {normalizedStatus === "driver assigned" && (
+    <>
+      <button
+        disabled={busy}
+        onClick={markArrived}
+        className="rounded-2xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+      >
+        Mark Arrived
+      </button>
 
+      <button
+        disabled={busy}
+        onClick={startRide}
+        className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        Start Ride
+      </button>
+    </>
+  )}
+
+  {normalizedStatus === "driver arrived" && (
+    <button
+      disabled={busy}
+      onClick={startRide}
+      className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+    >
+      Start Ride
+    </button>
+  )}
+
+  {normalizedStatus === "ongoing" && (
+    <button
+      disabled={busy}
+      onClick={completeRide}
+      className="rounded-2xl bg-green-600 px-4 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+    >
+      Complete Ride
+    </button>
+  )}
+</div>
                 {/* Pickup */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="flex items-start gap-3">

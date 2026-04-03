@@ -1,18 +1,18 @@
 // src/lib/invoicesApi.ts
 import { api } from "./api";
 
-export const INVOICE_TYPES = ["ride", "monthly", "period"] as const;
+export const INVOICE_TYPES = ["ride", "monthly", "period", "ta", "penalty"] as const;
 export type InvoiceType = (typeof INVOICE_TYPES)[number];
 
 export const INVOICE_STATUSES = ["issued", "paid", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
-export const INVOICE_REF_TYPES = ["ride", "period"] as const;
+export const INVOICE_REF_TYPES = ["ride", "period", "ta", "penalty"] as const;
 export type InvoiceRefType = (typeof INVOICE_REF_TYPES)[number];
 
 export type InvoiceItem = {
-  refType: InvoiceRefType; // "ride" | "period"
-  refId: string;
+refType: InvoiceRefType; // "ride" | "period" | "ta" | "penalty"
+refId: string;
   description: string;
   amount: number; // base amount
   taxAmount: number; // tax
