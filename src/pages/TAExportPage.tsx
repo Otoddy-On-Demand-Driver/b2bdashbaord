@@ -5,6 +5,7 @@ import { opsCompletedRides, type Ride } from "../lib/opsApi";
 import { apiErrorMessage } from "../lib/api";
 
 type Mode = "ALL_EXTRA" | "TA_ONLY" | "EXTEND_ONLY";
+type InvoiceKind = "TA" | "PERIOD";
 
 function csvEscape(v: any) {
   const s = String(v ?? "");
@@ -160,12 +161,12 @@ export default function TARidesExportPage() {
 
   // filters
   const [mode, setMode] = useState<Mode>("ALL_EXTRA");
+  const [invoiceKind, setInvoiceKind] = useState<InvoiceKind>("TA");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const [q, setQ] = useState<string>("");
-
-  // NEW: custom invoice amount
   const [customInvoiceAmount, setCustomInvoiceAmount] = useState<string>("");
+  const [periodLabel, setPeriodLabel] = useState<string>("");
 
   async function load() {
     setErr("");
@@ -268,76 +269,85 @@ export default function TARidesExportPage() {
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
-async function downloadTaInvoicePdf() {
-  try {
-    setErr("");
+  async function downloadInvoicePdf() {
+    try {
+      setErr("");
 
-    const enteredAmount = Number(customInvoiceAmount || 0);
+      const enteredAmount = Number(customInvoiceAmount || 0);
 
-    if (!enteredAmount || enteredAmount <= 0) {
-      setErr("Please enter a valid invoice amount.");
-      return;
+      if (!enteredAmount || enteredAmount <= 0) {
+        setErr("Please enter a valid invoice amount.");
+        return;
+      }
+
+      setBusyExport(true);
+
+      let endpoint = "";
+      const payload: any = {
+        customAmount: enteredAmount,
+      };
+
+      if (fromDate) payload.startDate = fromDate;
+      if (toDate) payload.endDate = toDate;
+
+      if (invoiceKind === "TA") {
+        endpoint = `${API_BASE}invoices/ta/generate`;
+        payload.mode = mode;
+      } else {
+        endpoint = `${API_BASE}invoices/period/generate-custom`;
+        if (periodLabel.trim()) payload.periodLabel = periodLabel.trim();
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.invoice?._id) {
+        throw new Error(data?.error || "Failed to generate invoice");
+      }
+
+      const pdfRes = await fetch(`${API_BASE}invoices/${data.invoice._id}/pdf`);
+
+      if (!pdfRes.ok) {
+        let message = "Failed to download invoice PDF";
+        try {
+          const pdfErr = await pdfRes.json();
+          message = pdfErr?.error || message;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const blob = await pdfRes.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      const tag =
+        invoiceKind === "PERIOD"
+          ? "period"
+          : mode === "TA_ONLY"
+            ? "ta"
+            : mode === "EXTEND_ONLY"
+              ? "extend"
+              : "ta-extra";
+
+      a.download = `${tag}-invoice.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Failed to generate invoice PDF"));
+    } finally {
+      setBusyExport(false);
     }
-
-    setBusyExport(true);
-
-    const payload: any = {
-      customAmount: enteredAmount,
-      mode,
-    };
-
-    // date optional hai, diya to backend me show hoga
-    if (fromDate) payload.startDate = fromDate;
-    if (toDate) payload.endDate = toDate;
-
-    const res = await fetch(`${API_BASE}invoices/ta/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data?.invoice?._id) {
-      throw new Error(data?.error || "Failed to generate invoice");
-    }
-
-    const pdfRes = await fetch(`${API_BASE}invoices/${data.invoice._id}/pdf`);
-
-    if (!pdfRes.ok) {
-      let message = "Failed to download invoice PDF";
-      try {
-        const pdfErr = await pdfRes.json();
-        message = pdfErr?.error || message;
-      } catch {}
-      throw new Error(message);
-    }
-
-    const blob = await pdfRes.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-
-    const tag =
-      mode === "TA_ONLY"
-        ? "ta"
-        : mode === "EXTEND_ONLY"
-          ? "extend"
-          : "ta-extra";
-
-    a.download = `${tag}-invoice.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Failed to generate invoice PDF"));
-  } finally {
-    setBusyExport(false);
   }
-}
 
   return (
     <div className="p-6 space-y-4">
@@ -345,8 +355,9 @@ async function downloadTaInvoicePdf() {
         <div>
           <div className="text-xl font-extrabold text-slate-900">TA / Extra Rides Export</div>
           <div className="text-sm text-slate-500">
-            Completed rides me se TA / extra charges ke basis par filter karke CSV export ya invoice PDF
-            download karo.
+            Completed rides me se TA / extra charges ke basis par filter karke CSV export ya invoice
+            PDF download karo. Period invoice ke liye custom amount se direct PDF bhi generate kar
+            sakte ho.
           </div>
         </div>
 
@@ -367,45 +378,59 @@ async function downloadTaInvoicePdf() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setMode("TA_ONLY")}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
-              mode === "TA_ONLY"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            TA Only
-          </button>
+        {invoiceKind === "TA" ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("TA_ONLY")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
+                mode === "TA_ONLY"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              TA Only
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setMode("ALL_EXTRA")}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
-              mode === "ALL_EXTRA"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            TA + Extra (All)
-          </button>
+            <button
+              type="button"
+              onClick={() => setMode("ALL_EXTRA")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
+                mode === "ALL_EXTRA"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              TA + Extra (All)
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setMode("EXTEND_ONLY")}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
-              mode === "EXTEND_ONLY"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            Extend Only
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setMode("EXTEND_ONLY")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold border ${
+                mode === "EXTEND_ONLY"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Extend Only
+            </button>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-3 items-end">
+          <label className="text-xs font-semibold text-slate-600">
+            Invoice Type
+            <select
+              value={invoiceKind}
+              onChange={(e) => setInvoiceKind(e.target.value as InvoiceKind)}
+              className="mt-2 h-11 w-[170px] rounded-2xl border border-slate-200 px-3 text-sm bg-white"
+            >
+              <option value="TA">TA Invoice</option>
+              <option value="PERIOD">Period Invoice</option>
+            </select>
+          </label>
+
           <label className="text-xs font-semibold text-slate-600">
             From
             <input
@@ -434,10 +459,27 @@ async function downloadTaInvoicePdf() {
               step="0.01"
               value={customInvoiceAmount}
               onChange={(e) => setCustomInvoiceAmount(e.target.value)}
-              placeholder={`Suggested: ${Math.round(suggestedInvoiceAmount || 0)}`}
+              placeholder={
+                invoiceKind === "TA"
+                  ? `Suggested: ${Math.round(suggestedInvoiceAmount || 0)}`
+                  : "Enter custom period amount"
+              }
               className="mt-2 h-11 w-[210px] rounded-2xl border border-slate-200 px-3 text-sm"
             />
           </label>
+
+          {invoiceKind === "PERIOD" ? (
+            <label className="text-xs font-semibold text-slate-600">
+              Period Label
+              <input
+                type="text"
+                value={periodLabel}
+                onChange={(e) => setPeriodLabel(e.target.value)}
+                placeholder="e.g. April 2026 Period Invoice"
+                className="mt-2 h-11 w-[240px] rounded-2xl border border-slate-200 px-3 text-sm"
+              />
+            </label>
+          ) : null}
 
           <label className="text-xs font-semibold text-slate-600 flex-1 min-w-[260px]">
             Search
@@ -470,9 +512,11 @@ async function downloadTaInvoicePdf() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Suggested Invoice</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Suggested Invoice
+            </div>
             <div className="mt-1 text-2xl font-extrabold text-slate-900">
-              {money(suggestedInvoiceAmount)}
+              {invoiceKind === "TA" ? money(suggestedInvoiceAmount) : "Manual"}
             </div>
           </div>
         </div>
@@ -481,7 +525,13 @@ async function downloadTaInvoicePdf() {
           <div className="text-sm font-semibold text-slate-700">
             Showing:{" "}
             <span className="font-extrabold text-slate-900">
-              {mode === "TA_ONLY" ? "TA Only" : mode === "EXTEND_ONLY" ? "Extend Only" : "TA + Extra"}
+              {invoiceKind === "PERIOD"
+                ? "Custom Period Invoice"
+                : mode === "TA_ONLY"
+                  ? "TA Only"
+                  : mode === "EXTEND_ONLY"
+                    ? "Extend Only"
+                    : "TA + Extra"}
             </span>
           </div>
 
@@ -503,12 +553,12 @@ async function downloadTaInvoicePdf() {
             </button>
 
             <button
-              disabled={busyExport || filtered.length === 0}
-              onClick={downloadTaInvoicePdf}
+              disabled={busyExport || (invoiceKind === "TA" && filtered.length === 0)}
+              onClick={downloadInvoicePdf}
               className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
             >
               <FileDown size={16} />
-              Download Invoice PDF
+              Download {invoiceKind === "TA" ? "Invoice" : "Period Invoice"} PDF
             </button>
           </div>
         </div>
