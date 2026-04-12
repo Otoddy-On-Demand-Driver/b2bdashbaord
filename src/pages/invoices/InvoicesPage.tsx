@@ -61,46 +61,62 @@ function downloadCSV(filename: string, csv: string) {
 // - business_function / trip_category
 function ridesToCSV(rides: Ride[]) {
   const headers = [
-    "Ride ID",
-    "Pickup",
-    "Drop",
-    "Distance (km)",
-    "Base Fare",
-    "Extended Fare",
-    "Total Fare",
-    "Business Function",
-    "Trip Category",
+    "_id",
+    "pickup_location",
+    "drop_location",
+    "start_ride_time",
+    "end_ride_time",
+    "ride_status",
+    "fare_estimation",
+    "extended_time_duration",
+    "base_fare",
+    "waiting_charge",
+    "TAFare",
+    "cancellationPenalityAmount",
+    "extended_actual_distance_fare",
+    "Grand Total",
+    "car_details.car_no",
+    "car_details.car_type",
+    "car_details.car_model",
+    "tripCategory",
   ];
 
   const lines: string[] = [];
   lines.push(headers.map(csvEscape).join(","));
 
   for (const r of rides || []) {
-    const realExtendedFare =
-      (r.extended_actual_distance_fare || 0) > (r.extended_distance_fare || 0)
-        ? (r.extended_actual_distance_fare || 0)
-        : (r.extended_distance_fare || 0);
+    const ride: any = r;
 
-    const extendedFare =
-      (realExtendedFare || 0) +
-      (r.actual_extended_time_fare || 0) +
-      (r.waiting_charge || 0);
+    const grandTotal =
+      ride["Grand Total"] ??
+      ride.grandTotal ??
+      ride.total_fare ??
+      0;
 
-    // @ts-ignore
-    const businessFunction = (r as any).business_function ?? (r as any).businessFunction ?? "";
-    // @ts-ignore
-    const tripCategory = (r as any).trip_category ?? (r as any).tripCategory ?? "";
+    const tripCategory =
+      ride.tripCategory ??
+      ride.trip_category ??
+      "";
 
     lines.push(
       [
-        r._id,
-        r.pickup_location,
-        r.drop_location,
-        r.distance_estimation,
-        r.fare_estimation,
-        extendedFare,
-        r.total_fare,
-        businessFunction,
+        ride._id ?? "",
+        ride.pickup_location ?? "",
+        ride.drop_location ?? "",
+        ride.start_ride_time ?? "",
+        ride.end_ride_time ?? "",
+        ride.ride_status ?? "",
+        ride.fare_estimation ?? "",
+        ride.extended_time_duration ?? "",
+        ride.base_fare ?? "",
+        ride.waiting_charge ?? "",
+        ride.TAFare ?? ride.ta_fare ?? "",
+        ride.cancellationPenalityAmount ?? "",
+        ride.extended_actual_distance_fare ?? "",
+        grandTotal,
+        ride.car_details?.car_no ?? "",
+        ride.car_details?.car_type ?? "",
+        ride.car_details?.car_model ?? "",
         tripCategory,
       ]
         .map(csvEscape)
