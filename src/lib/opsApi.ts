@@ -395,3 +395,21 @@ export async function opsUpdateRideStatus(rideId: string, payload: any) {
   const { data } = await api.patch(`/ops/rides/${rideId}/update-status`, payload);
   return data;
 }
+
+
+export async function opsChangePickupOrDropLatLong(
+  rideId: string,
+  payload: {
+    pickup_latitude?: number | string;
+    pickup_longitude?: number | string;
+    drop_latitude?: number | string;
+    drop_longitude?: number | string;
+  }
+) {
+  const res = await api.patch(
+    `/ops/rides/${rideId}/change-location-latlong`,
+    payload
+  );
+
+  return res.data;
+}

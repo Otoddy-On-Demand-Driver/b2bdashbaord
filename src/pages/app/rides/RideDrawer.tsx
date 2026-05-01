@@ -31,7 +31,8 @@ import {
   opsDeleteRideImage,
   opsUpdateRideFields, // ✅ add
   opsUpdateRideTA,
-  opsUpdateRideStatus, // ✅ add
+  opsUpdateRideStatus,
+  opsChangePickupOrDropLatLong, // ✅ add
   type Driver,
   type Ride,
 } from "../../../lib/opsApi";
@@ -283,6 +284,16 @@ export default function RideDrawer({
     extended_actual_distance_fare: "",
   });
 
+  const [latLongOpen, setLatLongOpen] = useState(false);
+const [latLongType, setLatLongType] = useState<"pickup" | "drop" | "both">("pickup");
+
+const [latLongForm, setLatLongForm] = useState({
+  pickup_latitude: "",
+  pickup_longitude: "",
+  drop_latitude: "",
+  drop_longitude: "",
+});
+
   // ✅ LIVE driver location on map
   const [liveDriverLoc, setLiveDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -332,10 +343,10 @@ const normalizedStatus = String(r?.ride_status || "").toLowerCase();
   }, [drivers, r?.AssignedDriver]);
 
   // ✅ coords
-  const pickupLat = r.pickup_latitude;
-  const pickupLng = r.pickup_longitude;
-  const dropLat = r.drop_latitude;
-  const dropLng = r.drop_longitude;
+ const pickupLat = r.changed_pickup_latitude ?? r.pickup_latitude;
+const pickupLng = r.changed_pickup_longitude ?? r.pickup_longitude;
+const dropLat = r.changed_drop_latitude ?? r.drop_latitude;
+const dropLng = r.changed_drop_longitude ?? r.drop_longitude;
 
   const pickupOk = isNum(pickupLat) && isNum(pickupLng);
   const dropOk = isNum(dropLat) && isNum(dropLng);
@@ -807,6 +818,56 @@ async function completeRide() {
     }
   }
 
+
+function openLatLongModal() {
+  const rr: any = ride || {};
+
+  setErr("");
+  setLatLongType("pickup");
+
+  setLatLongForm({
+    pickup_latitude: String(rr?.changed_pickup_latitude ?? rr?.pickup_latitude ?? ""),
+    pickup_longitude: String(rr?.changed_pickup_longitude ?? rr?.pickup_longitude ?? ""),
+    drop_latitude: String(rr?.changed_drop_latitude ?? rr?.drop_latitude ?? ""),
+    drop_longitude: String(rr?.changed_drop_longitude ?? rr?.drop_longitude ?? ""),
+  });
+
+  setLatLongOpen(true);
+}
+
+async function saveLatLongChange() {
+  if (!rideId) return;
+
+  const payload: any = {};
+
+  if (latLongType === "pickup" || latLongType === "both") {
+    payload.pickup_latitude = latLongForm.pickup_latitude;
+    payload.pickup_longitude = latLongForm.pickup_longitude;
+  }
+
+  if (latLongType === "drop" || latLongType === "both") {
+    payload.drop_latitude = latLongForm.drop_latitude;
+    payload.drop_longitude = latLongForm.drop_longitude;
+  }
+
+  setBusy(true);
+  setErr("");
+
+  try {
+    await opsChangePickupOrDropLatLong(rideId, payload);
+
+    setLatLongOpen(false);
+    await load();
+    onMutated();
+  } catch (e: any) {
+    setErr(apiErrorMessage(e, "Lat long update failed"));
+  } finally {
+    setBusy(false);
+  }
+}
+
+
+
   // ✅ CSV export for this ride (single row)
   function exportRideCSV() {
     const rr: any = ride || {};
@@ -1174,10 +1235,39 @@ async function completeRide() {
 
               {/* Coordinates */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
+  <div className="flex items-center justify-between gap-3">
+    <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
+
+    <button
+      disabled={busy}
+      onClick={openLatLongModal}
+      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+    >
+      Change Lat Long
+    </button>
+  </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field label="Pickup (lat, lng)" value={pickupOk ? `${pickupLat}, ${pickupLng}` : "—"} />
-                  <Field label="Drop (lat, lng)" value={dropOk ? `${dropLat}, ${dropLng}` : "—"} />
+                  <Field
+  label="Pickup (lat, lng)"
+  value={
+    r.changed_pickup_latitude
+      ? `NEW: ${pickupLat}, ${pickupLng} | OLD: ${r.pickup_latitude}, ${r.pickup_longitude}`
+      : pickupOk
+      ? `${pickupLat}, ${pickupLng}`
+      : "—"
+  }
+/>
+
+<Field
+  label="Drop (lat, lng)"
+  value={
+    r.changed_drop_latitude
+      ? `NEW: ${dropLat}, ${dropLng} | OLD: ${r.drop_latitude}, ${r.drop_longitude}`
+      : dropOk
+      ? `${dropLat}, ${dropLng}`
+      : "—"
+  }
+/>
                 </div>
               </div>
 
@@ -1371,6 +1461,143 @@ async function completeRide() {
                   </div>
                 </div>
               ) : null}
+     
+
+
+{latLongOpen ? (
+  <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+    <button
+      className="absolute inset-0 bg-black/30"
+      onClick={() => setLatLongOpen(false)}
+    />
+
+    <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-extrabold text-slate-900">
+          Change Pickup / Drop Lat Long
+        </div>
+
+        <button
+          onClick={() => setLatLongOpen(false)}
+          className="rounded-xl p-2 hover:bg-slate-100"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <div className="mt-4">
+        <label className="text-xs font-semibold text-slate-600">
+          Kya change hua hai?
+        </label>
+
+        <select
+          value={latLongType}
+          onChange={(e) =>
+            setLatLongType(e.target.value as "pickup" | "drop" | "both")
+          }
+          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+        >
+          <option value="pickup">Only Pickup Changed</option>
+          <option value="drop">Only Drop Changed</option>
+          <option value="both">Pickup & Drop Both Changed</option>
+        </select>
+      </div>
+
+      {(latLongType === "pickup" || latLongType === "both") ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="text-xs font-extrabold text-slate-700">
+            New Pickup Coordinates
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <input
+              type="number"
+              step="any"
+              value={latLongForm.pickup_latitude}
+              onChange={(e) =>
+                setLatLongForm((p) => ({
+                  ...p,
+                  pickup_latitude: e.target.value,
+                }))
+              }
+              placeholder="Pickup Latitude"
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+            />
+
+            <input
+              type="number"
+              step="any"
+              value={latLongForm.pickup_longitude}
+              onChange={(e) =>
+                setLatLongForm((p) => ({
+                  ...p,
+                  pickup_longitude: e.target.value,
+                }))
+              }
+              placeholder="Pickup Longitude"
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {(latLongType === "drop" || latLongType === "both") ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="text-xs font-extrabold text-slate-700">
+            New Drop Coordinates
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <input
+              type="number"
+              step="any"
+              value={latLongForm.drop_latitude}
+              onChange={(e) =>
+                setLatLongForm((p) => ({
+                  ...p,
+                  drop_latitude: e.target.value,
+                }))
+              }
+              placeholder="Drop Latitude"
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+            />
+
+            <input
+              type="number"
+              step="any"
+              value={latLongForm.drop_longitude}
+              onChange={(e) =>
+                setLatLongForm((p) => ({
+                  ...p,
+                  drop_longitude: e.target.value,
+                }))
+              }
+              placeholder="Drop Longitude"
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex gap-2">
+        <button
+          onClick={() => setLatLongOpen(false)}
+          className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+        >
+          Close
+        </button>
+
+        <button
+          disabled={busy}
+          onClick={saveLatLongChange}
+          className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          Save Lat Long
+        </button>
+      </div>
+    </div>
+  </div>
+) : null}
 
               {/* Car details */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
