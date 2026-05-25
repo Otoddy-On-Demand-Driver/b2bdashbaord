@@ -25,7 +25,7 @@ import B2BRidesPage from "./pages/b2b/B2BRidesPage";
 
 import InvoicesPage from "./pages/invoices/InvoicesPage";
 import InvoiceView from "./pages/invoices/InvoiceView";
-
+import CreditNotes from "./pages/CreditNotes";
 export default function App() {
   const hydrate = authStore((s) => s.hydrate);
 
@@ -59,7 +59,10 @@ export default function App() {
             <Route element={<RoleGate allow={["admin", "opsteam","b2bclient"]} />}>
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceView />} />
-
+<Route
+    path="credit-notes"
+    element={<CreditNotes />}
+  />
             </Route>
 
             {/* Role-based: admin + opsteam */}

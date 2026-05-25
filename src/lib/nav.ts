@@ -8,6 +8,7 @@ import {
   UserPlus,
   ClipboardPlus,
   Download, // ✅ TA Export icon
+  BadgeIndianRupee, // ✅ add
 
   FileText,    // ✅ Invoices
 } from "lucide-react";
@@ -92,6 +93,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     roles: ["admin",  "b2bclient"],
   },
+
+
+{
+  key: "creditNotes",
+  label: "Credit Notes",
+  to: "/credit-notes",
+  icon: BadgeIndianRupee,
+  roles: ["admin", "b2bclient"],
+},
 
    // ================= TA EXPORT =================
   {

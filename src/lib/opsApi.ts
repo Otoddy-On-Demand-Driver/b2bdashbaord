@@ -406,8 +406,8 @@ export async function opsChangePickupOrDropLatLong(
     drop_longitude?: number | string;
   }
 ) {
-  const res = await api.patch(
-    `/ops/rides/${rideId}/change-location-latlong`,
+  const res = await api.post(
+    `/ops/rides/${rideId}/change-pickup-or-drop-lat-long`,
     payload
   );
 
