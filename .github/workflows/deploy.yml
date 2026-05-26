@@ -26,7 +26,7 @@ jobs:
             echo "✅ Connected to EC2"
 
             echo "➡️ Moving to project directory"
-            cd /home/ec2-user/b2bdashbaord
+            cd /home/ubuntu/b2bdashbaord
 
             echo "➡️ Pulling latest code"
             git pull origin main
