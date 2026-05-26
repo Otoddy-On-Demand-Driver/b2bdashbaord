@@ -43,6 +43,7 @@ type FormState = {
   amount: string;
   description: string;
   originalInvoiceNo: string;
+  originalInvoiceDate: string;
   clientName: string;
   clientGstin: string;
   clientAddressLines: string;
@@ -93,6 +94,7 @@ export default function CreditNotes() {
     amount: "",
     description: "",
     originalInvoiceNo: "",
+    originalInvoiceDate: "",
     clientName: "Valuedrive Technologies Private Limited",
     clientGstin: "07AAGCV7548B1Z8",
     clientAddressLines:
@@ -178,6 +180,7 @@ export default function CreditNotes() {
       amount: "",
       description: "",
       originalInvoiceNo: "",
+      originalInvoiceDate: "",
       clientName: "Valuedrive Technologies Private Limited",
       clientGstin: "07AAGCV7548B1Z8",
       clientAddressLines:
@@ -222,6 +225,7 @@ export default function CreditNotes() {
         amount,
         description: form.description.trim(),
         originalInvoiceNo: form.originalInvoiceNo.trim(),
+        originalInvoiceDate: form.originalInvoiceDate,
         clientName: form.clientName.trim(),
         clientGstin: form.clientGstin.trim(),
         issuedAt: form.issuedAt,
@@ -594,6 +598,21 @@ export default function CreditNotes() {
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                 />
               </div>
+
+              <div>
+  <label className="mb-1 block text-sm font-semibold text-slate-700">
+    Original Invoice Date
+  </label>
+
+  <input
+    type="date"
+    value={form.originalInvoiceDate}
+    onChange={(event) =>
+      updateForm("originalInvoiceDate", event.target.value)
+    }
+    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+  />
+</div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
