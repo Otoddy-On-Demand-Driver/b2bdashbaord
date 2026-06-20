@@ -91,7 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Invoices",
     to: "/invoices",
     icon: FileText,
-    roles: ["admin",  "b2bclient"],
+    roles: ["admin"],
   },
 
 
@@ -100,7 +100,7 @@ export const NAV_ITEMS: NavItem[] = [
   label: "Credit Notes",
   to: "/credit-notes",
   icon: BadgeIndianRupee,
-  roles: ["admin", "b2bclient"],
+  roles: ["admin"],
 },
 
    // ================= TA EXPORT =================
