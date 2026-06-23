@@ -285,14 +285,14 @@ export default function RideDrawer({
   });
 
   const [latLongOpen, setLatLongOpen] = useState(false);
-const [latLongType, setLatLongType] = useState<"pickup" | "drop" | "both">("pickup");
+  const [latLongType, setLatLongType] = useState<"pickup" | "drop" | "both">("pickup");
 
-const [latLongForm, setLatLongForm] = useState({
-  pickup_latitude: "",
-  pickup_longitude: "",
-  drop_latitude: "",
-  drop_longitude: "",
-});
+  const [latLongForm, setLatLongForm] = useState({
+    pickup_latitude: "",
+    pickup_longitude: "",
+    drop_latitude: "",
+    drop_longitude: "",
+  });
 
   // ✅ LIVE driver location on map
   const [liveDriverLoc, setLiveDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -310,8 +310,8 @@ const [latLongForm, setLatLongForm] = useState({
   >([]);
 
   const r: any = ride || {};
-const normalizedStatus = String(r?.ride_status || "").toLowerCase();
-const hasAssignedDriver = !!(r?.AssignedDriver?.driverId || r?.AssignedDriver?._id || r?.AssignedDriver?.id || r?.AssignedDriver?.name);
+  const normalizedStatus = String(r?.ride_status || "").toLowerCase();
+  const hasAssignedDriver = !!(r?.AssignedDriver?.driverId || r?.AssignedDriver?._id || r?.AssignedDriver?.id || r?.AssignedDriver?.name);
   // ✅ driver lookup map (id -> {name, phone})
   const driverInfoById = useMemo(() => {
     const m = new Map<string, { name?: string; phone?: string }>();
@@ -344,10 +344,10 @@ const hasAssignedDriver = !!(r?.AssignedDriver?.driverId || r?.AssignedDriver?._
   }, [drivers, r?.AssignedDriver]);
 
   // ✅ coords
- const pickupLat = r.changed_pickup_latitude ?? r.pickup_latitude;
-const pickupLng = r.changed_pickup_longitude ?? r.pickup_longitude;
-const dropLat = r.changed_drop_latitude ?? r.drop_latitude;
-const dropLng = r.changed_drop_longitude ?? r.drop_longitude;
+  const pickupLat = r.changed_pickup_latitude ?? r.pickup_latitude;
+  const pickupLng = r.changed_pickup_longitude ?? r.pickup_longitude;
+  const dropLat = r.changed_drop_latitude ?? r.drop_latitude;
+  const dropLng = r.changed_drop_longitude ?? r.drop_longitude;
 
   const pickupOk = isNum(pickupLat) && isNum(pickupLng);
   const dropOk = isNum(dropLat) && isNum(dropLng);
@@ -505,60 +505,61 @@ const dropLng = r.changed_drop_longitude ?? r.drop_longitude;
     }
   }
 
-async function markArrived() {
-  if (!rideId) return;
-  if (!confirm("Driver arrived mark karne ke baad cancellation pe penalty lag sakti hai. Continue?")) return;
+  async function markArrived() {
+    if (!rideId) return;
+    if (!confirm("Driver arrived mark karne ke baad cancellation pe penalty lag sakti hai. Continue?")) return;
 
-  setBusy(true);
-  setErr("");
-  try {
-    await opsUpdateRideStatus(rideId, {
-      status: "driver_arrived",
-    });
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Failed to mark arrived"));
-  } finally {
-    setBusy(false);
+    setBusy(true);
+    setErr("");
+    try {
+      await opsUpdateRideStatus(rideId, {
+        status: "driver_arrived",
+      });
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Failed to mark arrived"));
+    } finally {
+      setBusy(false);
+    }
   }
-}
 
-async function startRide() {
-  if (!rideId) return;
+  async function startRide() {
+    if (!rideId) return;
 
-  setBusy(true);
-  setErr("");
-  try {
-    await opsUpdateRideStatus(rideId, {
-      status: "ongoing",
-    });
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Failed to start ride"));
-  } finally {
-    setBusy(false);
+    setBusy(true);
+    setErr("");
+    try {
+      await opsUpdateRideStatus(rideId, {
+        status: "ongoing",
+        start_time: new Date().toISOString()
+      });
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Failed to start ride"));
+    } finally {
+      setBusy(false);
+    }
   }
-}
 
-async function completeRide() {
-  if (!rideId) return;
+  async function completeRide() {
+    if (!rideId) return;
 
-  setBusy(true);
-  setErr("");
-  try {
-    await opsUpdateRideStatus(rideId, {
-      status: "completed",
-    });
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Failed to complete ride"));
-  } finally {
-    setBusy(false);
+    setBusy(true);
+    setErr("");
+    try {
+      await opsUpdateRideStatus(rideId, {
+        status: "completed",
+      });
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Failed to complete ride"));
+    } finally {
+      setBusy(false);
+    }
   }
-}
 
 
   const canApprove = useMemo(
@@ -828,52 +829,52 @@ async function completeRide() {
   }
 
 
-function openLatLongModal() {
-  const rr: any = ride || {};
+  function openLatLongModal() {
+    const rr: any = ride || {};
 
-  setErr("");
-  setLatLongType("pickup");
+    setErr("");
+    setLatLongType("pickup");
 
-  setLatLongForm({
-    pickup_latitude: String(rr?.changed_pickup_latitude ?? rr?.pickup_latitude ?? ""),
-    pickup_longitude: String(rr?.changed_pickup_longitude ?? rr?.pickup_longitude ?? ""),
-    drop_latitude: String(rr?.changed_drop_latitude ?? rr?.drop_latitude ?? ""),
-    drop_longitude: String(rr?.changed_drop_longitude ?? rr?.drop_longitude ?? ""),
-  });
+    setLatLongForm({
+      pickup_latitude: String(rr?.changed_pickup_latitude ?? rr?.pickup_latitude ?? ""),
+      pickup_longitude: String(rr?.changed_pickup_longitude ?? rr?.pickup_longitude ?? ""),
+      drop_latitude: String(rr?.changed_drop_latitude ?? rr?.drop_latitude ?? ""),
+      drop_longitude: String(rr?.changed_drop_longitude ?? rr?.drop_longitude ?? ""),
+    });
 
-  setLatLongOpen(true);
-}
-
-async function saveLatLongChange() {
-  if (!rideId) return;
-
-  const payload: any = {};
-
-  if (latLongType === "pickup" || latLongType === "both") {
-    payload.pickup_latitude = latLongForm.pickup_latitude;
-    payload.pickup_longitude = latLongForm.pickup_longitude;
+    setLatLongOpen(true);
   }
 
-  if (latLongType === "drop" || latLongType === "both") {
-    payload.drop_latitude = latLongForm.drop_latitude;
-    payload.drop_longitude = latLongForm.drop_longitude;
+  async function saveLatLongChange() {
+    if (!rideId) return;
+
+    const payload: any = {};
+
+    if (latLongType === "pickup" || latLongType === "both") {
+      payload.pickup_latitude = latLongForm.pickup_latitude;
+      payload.pickup_longitude = latLongForm.pickup_longitude;
+    }
+
+    if (latLongType === "drop" || latLongType === "both") {
+      payload.drop_latitude = latLongForm.drop_latitude;
+      payload.drop_longitude = latLongForm.drop_longitude;
+    }
+
+    setBusy(true);
+    setErr("");
+
+    try {
+      await opsChangePickupOrDropLatLong(rideId, payload);
+
+      setLatLongOpen(false);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Lat long update failed"));
+    } finally {
+      setBusy(false);
+    }
   }
-
-  setBusy(true);
-  setErr("");
-
-  try {
-    await opsChangePickupOrDropLatLong(rideId, payload);
-
-    setLatLongOpen(false);
-    await load();
-    onMutated();
-  } catch (e: any) {
-    setErr(apiErrorMessage(e, "Lat long update failed"));
-  } finally {
-    setBusy(false);
-  }
-}
 
 
 
@@ -920,8 +921,8 @@ async function saveLatLongChange() {
   const startImgs: string[] = Array.isArray(r.start_car_images)
     ? r.start_car_images
     : Array.isArray(r.start_car_images_)
-    ? r.start_car_images_
-    : [];
+      ? r.start_car_images_
+      : [];
   const endImgs: string[] = Array.isArray(r.end_car_images) ? r.end_car_images : [];
 
   // meta
@@ -955,17 +956,17 @@ async function saveLatLongChange() {
   const driverToPickupKm =
     driverOk && pickupOk
       ? haversineKm(
-          { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
-          { lat: pickupLat, lng: pickupLng }
-        )
+        { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
+        { lat: pickupLat, lng: pickupLng }
+      )
       : null;
 
   const driverToDropKm =
     driverOk && dropOk
       ? haversineKm(
-          { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
-          { lat: dropLat, lng: dropLng }
-        )
+        { lat: liveDriverLoc!.lat, lng: liveDriverLoc!.lng },
+        { lat: dropLat, lng: dropLng }
+      )
       : null;
 
   // Map center fallback
@@ -973,8 +974,8 @@ async function saveLatLongChange() {
     liveDriverLoc
       ? [liveDriverLoc.lat, liveDriverLoc.lng]
       : pickupOk
-      ? [pickupLat, pickupLng]
-      : [28.6139, 77.209];
+        ? [pickupLat, pickupLng]
+        : [28.6139, 77.209];
 
   return (
     <div className="fixed inset-0 z-50">
@@ -1014,16 +1015,16 @@ async function saveLatLongChange() {
                 {/* ✅ Nearest drivers markers (from pickup) */}
                 {pickupOk
                   ? nearestDrivers.map((d) => (
-                      <Marker key={d.driverId} icon={pinIcon} position={[d.lat, d.lng]}>
-                        <Popup>
-                          Nearest Driver
-                          <br />
-                          {d.name || "Unknown"} • {d.phone || "—"}
-                          <br />
-                          {d.kmFromPickup.toFixed(2)} km from pickup
-                        </Popup>
-                      </Marker>
-                    ))
+                    <Marker key={d.driverId} icon={pinIcon} position={[d.lat, d.lng]}>
+                      <Popup>
+                        Nearest Driver
+                        <br />
+                        {d.name || "Unknown"} • {d.phone || "—"}
+                        <br />
+                        {d.kmFromPickup.toFixed(2)} km from pickup
+                      </Popup>
+                    </Marker>
+                  ))
                   : null}
 
                 {/* Route line */}
@@ -1032,14 +1033,14 @@ async function saveLatLongChange() {
                     positions={
                       liveDriverLoc
                         ? [
-                            [pickupLat, pickupLng],
-                            [liveDriverLoc.lat, liveDriverLoc.lng],
-                            [dropLat, dropLng],
-                          ]
+                          [pickupLat, pickupLng],
+                          [liveDriverLoc.lat, liveDriverLoc.lng],
+                          [dropLat, dropLng],
+                        ]
                         : [
-                            [pickupLat, pickupLng],
-                            [dropLat, dropLng],
-                          ]
+                          [pickupLat, pickupLng],
+                          [dropLat, dropLng],
+                        ]
                     }
                   />
                 ) : null}
@@ -1161,47 +1162,47 @@ async function saveLatLongChange() {
                     </div>
                   </div>
                 </div>
-<div className="flex flex-wrap gap-2">
-  {normalizedStatus === "driver assigned" && (
-    <>
-      <button
-        disabled={busy}
-        onClick={markArrived}
-        className="rounded-2xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
-      >
-        Mark Arrived
-      </button>
+                <div className="flex flex-wrap gap-2">
+                  {normalizedStatus === "driver assigned" && (
+                    <>
+                      <button
+                        disabled={busy}
+                        onClick={markArrived}
+                        className="rounded-2xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                      >
+                        Mark Arrived
+                      </button>
 
-      <button
-        disabled={busy}
-        onClick={startRide}
-        className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        Start Ride
-      </button>
-    </>
-  )}
+                      <button
+                        disabled={busy}
+                        onClick={startRide}
+                        className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Start Ride
+                      </button>
+                    </>
+                  )}
 
-  {normalizedStatus === "driver arrived" && (
-    <button
-      disabled={busy}
-      onClick={startRide}
-      className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-    >
-      Start Ride
-    </button>
-  )}
+                  {normalizedStatus === "driver arrived" && (
+                    <button
+                      disabled={busy}
+                      onClick={startRide}
+                      className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Start Ride
+                    </button>
+                  )}
 
-  {normalizedStatus === "ongoing" && (
-    <button
-      disabled={busy}
-      onClick={completeRide}
-      className="rounded-2xl bg-green-600 px-4 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-    >
-      Complete Ride
-    </button>
-  )}
-</div>
+                  {normalizedStatus === "ongoing" && (
+                    <button
+                      disabled={busy}
+                      onClick={completeRide}
+                      className="rounded-2xl bg-green-600 px-4 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Complete Ride
+                    </button>
+                  )}
+                </div>
                 {/* Pickup */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="flex items-start gap-3">
@@ -1244,39 +1245,39 @@ async function saveLatLongChange() {
 
               {/* Coordinates */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
-  <div className="flex items-center justify-between gap-3">
-    <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-extrabold text-slate-900">Coordinates</div>
 
-    <button
-      disabled={busy}
-      onClick={openLatLongModal}
-      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
-    >
-      Change Lat Long
-    </button>
-  </div>
+                  <button
+                    disabled={busy}
+                    onClick={openLatLongModal}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Change Lat Long
+                  </button>
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Field
-  label="Pickup (lat, lng)"
-  value={
-    r.changed_pickup_latitude
-      ? `NEW: ${pickupLat}, ${pickupLng} | OLD: ${r.pickup_latitude}, ${r.pickup_longitude}`
-      : pickupOk
-      ? `${pickupLat}, ${pickupLng}`
-      : "—"
-  }
-/>
+                    label="Pickup (lat, lng)"
+                    value={
+                      r.changed_pickup_latitude
+                        ? `NEW: ${pickupLat}, ${pickupLng} | OLD: ${r.pickup_latitude}, ${r.pickup_longitude}`
+                        : pickupOk
+                          ? `${pickupLat}, ${pickupLng}`
+                          : "—"
+                    }
+                  />
 
-<Field
-  label="Drop (lat, lng)"
-  value={
-    r.changed_drop_latitude
-      ? `NEW: ${dropLat}, ${dropLng} | OLD: ${r.drop_latitude}, ${r.drop_longitude}`
-      : dropOk
-      ? `${dropLat}, ${dropLng}`
-      : "—"
-  }
-/>
+                  <Field
+                    label="Drop (lat, lng)"
+                    value={
+                      r.changed_drop_latitude
+                        ? `NEW: ${dropLat}, ${dropLng} | OLD: ${r.drop_latitude}, ${r.drop_longitude}`
+                        : dropOk
+                          ? `${dropLat}, ${dropLng}`
+                          : "—"
+                    }
+                  />
                 </div>
               </div>
 
@@ -1292,9 +1293,8 @@ async function saveLatLongChange() {
                     label="Nearest Driver (from Pickup)"
                     value={
                       nearestDrivers.length
-                        ? `${fmtKm(nearestDrivers[0].kmFromPickup)} • ${nearestDrivers[0].name || "Unknown"} • ${
-                            nearestDrivers[0].phone || "—"
-                          }`
+                        ? `${fmtKm(nearestDrivers[0].kmFromPickup)} • ${nearestDrivers[0].name || "Unknown"} • ${nearestDrivers[0].phone || "—"
+                        }`
                         : "—"
                     }
                   />
@@ -1470,143 +1470,143 @@ async function saveLatLongChange() {
                   </div>
                 </div>
               ) : null}
-     
 
 
-{latLongOpen ? (
-  <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-    <button
-      className="absolute inset-0 bg-black/30"
-      onClick={() => setLatLongOpen(false)}
-    />
 
-    <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-extrabold text-slate-900">
-          Change Pickup / Drop Lat Long
-        </div>
+              {latLongOpen ? (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                  <button
+                    className="absolute inset-0 bg-black/30"
+                    onClick={() => setLatLongOpen(false)}
+                  />
 
-        <button
-          onClick={() => setLatLongOpen(false)}
-          className="rounded-xl p-2 hover:bg-slate-100"
-        >
-          <X size={18} />
-        </button>
-      </div>
+                  <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-extrabold text-slate-900">
+                        Change Pickup / Drop Lat Long
+                      </div>
 
-      <div className="mt-4">
-        <label className="text-xs font-semibold text-slate-600">
-          Kya change hua hai?
-        </label>
+                      <button
+                        onClick={() => setLatLongOpen(false)}
+                        className="rounded-xl p-2 hover:bg-slate-100"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
 
-        <select
-          value={latLongType}
-          onChange={(e) =>
-            setLatLongType(e.target.value as "pickup" | "drop" | "both")
-          }
-          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-        >
-          <option value="pickup">Only Pickup Changed</option>
-          <option value="drop">Only Drop Changed</option>
-          <option value="both">Pickup & Drop Both Changed</option>
-        </select>
-      </div>
+                    <div className="mt-4">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Kya change hua hai?
+                      </label>
 
-      {(latLongType === "pickup" || latLongType === "both") ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="text-xs font-extrabold text-slate-700">
-            New Pickup Coordinates
-          </div>
+                      <select
+                        value={latLongType}
+                        onChange={(e) =>
+                          setLatLongType(e.target.value as "pickup" | "drop" | "both")
+                        }
+                        className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                      >
+                        <option value="pickup">Only Pickup Changed</option>
+                        <option value="drop">Only Drop Changed</option>
+                        <option value="both">Pickup & Drop Both Changed</option>
+                      </select>
+                    </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <input
-              type="number"
-              step="any"
-              value={latLongForm.pickup_latitude}
-              onChange={(e) =>
-                setLatLongForm((p) => ({
-                  ...p,
-                  pickup_latitude: e.target.value,
-                }))
-              }
-              placeholder="Pickup Latitude"
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
-            />
+                    {(latLongType === "pickup" || latLongType === "both") ? (
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-extrabold text-slate-700">
+                          New Pickup Coordinates
+                        </div>
 
-            <input
-              type="number"
-              step="any"
-              value={latLongForm.pickup_longitude}
-              onChange={(e) =>
-                setLatLongForm((p) => ({
-                  ...p,
-                  pickup_longitude: e.target.value,
-                }))
-              }
-              placeholder="Pickup Longitude"
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
-            />
-          </div>
-        </div>
-      ) : null}
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            step="any"
+                            value={latLongForm.pickup_latitude}
+                            onChange={(e) =>
+                              setLatLongForm((p) => ({
+                                ...p,
+                                pickup_latitude: e.target.value,
+                              }))
+                            }
+                            placeholder="Pickup Latitude"
+                            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+                          />
 
-      {(latLongType === "drop" || latLongType === "both") ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="text-xs font-extrabold text-slate-700">
-            New Drop Coordinates
-          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={latLongForm.pickup_longitude}
+                            onChange={(e) =>
+                              setLatLongForm((p) => ({
+                                ...p,
+                                pickup_longitude: e.target.value,
+                              }))
+                            }
+                            placeholder="Pickup Longitude"
+                            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <input
-              type="number"
-              step="any"
-              value={latLongForm.drop_latitude}
-              onChange={(e) =>
-                setLatLongForm((p) => ({
-                  ...p,
-                  drop_latitude: e.target.value,
-                }))
-              }
-              placeholder="Drop Latitude"
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
-            />
+                    {(latLongType === "drop" || latLongType === "both") ? (
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-extrabold text-slate-700">
+                          New Drop Coordinates
+                        </div>
 
-            <input
-              type="number"
-              step="any"
-              value={latLongForm.drop_longitude}
-              onChange={(e) =>
-                setLatLongForm((p) => ({
-                  ...p,
-                  drop_longitude: e.target.value,
-                }))
-              }
-              placeholder="Drop Longitude"
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
-            />
-          </div>
-        </div>
-      ) : null}
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            step="any"
+                            value={latLongForm.drop_latitude}
+                            onChange={(e) =>
+                              setLatLongForm((p) => ({
+                                ...p,
+                                drop_latitude: e.target.value,
+                              }))
+                            }
+                            placeholder="Drop Latitude"
+                            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+                          />
 
-      <div className="mt-5 flex gap-2">
-        <button
-          onClick={() => setLatLongOpen(false)}
-          className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
-        >
-          Close
-        </button>
+                          <input
+                            type="number"
+                            step="any"
+                            value={latLongForm.drop_longitude}
+                            onChange={(e) =>
+                              setLatLongForm((p) => ({
+                                ...p,
+                                drop_longitude: e.target.value,
+                              }))
+                            }
+                            placeholder="Drop Longitude"
+                            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
 
-        <button
-          disabled={busy}
-          onClick={saveLatLongChange}
-          className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Save Lat Long
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => setLatLongOpen(false)}
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                      >
+                        Close
+                      </button>
+
+                      <button
+                        disabled={busy}
+                        onClick={saveLatLongChange}
+                        className="flex-1 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save Lat Long
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Car details */}
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
@@ -1651,11 +1651,10 @@ async function saveLatLongChange() {
                 <button
                   disabled={busy}
                   onClick={openAssign}
-                  className={`mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
-                    hasAssignedDriver
+                  className={`mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${hasAssignedDriver
                       ? "bg-orange-600 hover:bg-orange-700"
                       : "bg-slate-900 hover:bg-slate-800"
-                  }`}
+                    }`}
                 >
                   <UserPlus size={18} />
                   {hasAssignedDriver ? "Change Driver" : "Assign Driver"}
@@ -1711,9 +1710,9 @@ async function saveLatLongChange() {
                       label="Extra Total (sum)"
                       value={money(
                         Number(r.actual_extended_time_fare || 0) +
-                          Number(r.waiting_charge || 0) +
-                          Number(r.extended_actual_distance_fare || 0) +
-                          Number(r.TAFare || 0)
+                        Number(r.waiting_charge || 0) +
+                        Number(r.extended_actual_distance_fare || 0) +
+                        Number(r.TAFare || 0)
                       )}
                     />
                   </div>
@@ -1954,11 +1953,10 @@ async function saveLatLongChange() {
                   <button
                     disabled={busy}
                     onClick={openAssign}
-                    className={`mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
-                      hasAssignedDriver
+                    className={`mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${hasAssignedDriver
                         ? "bg-orange-600 hover:bg-orange-700"
                         : "bg-slate-900 hover:bg-slate-800"
-                    }`}
+                      }`}
                   >
                     <UserPlus size={18} />
                     {hasAssignedDriver ? "Change Driver" : "Assign Driver"}
@@ -2402,8 +2400,8 @@ async function saveLatLongChange() {
                           <span className="font-extrabold text-slate-900">
                             {money(
                               Number(extraForm.actual_extended_time_fare || 0) +
-                                Number(extraForm.waiting_charge || 0) +
-                                Number(extraForm.extended_actual_distance_fare || 0)
+                              Number(extraForm.waiting_charge || 0) +
+                              Number(extraForm.extended_actual_distance_fare || 0)
                             )}
                           </span>
                         </div>
