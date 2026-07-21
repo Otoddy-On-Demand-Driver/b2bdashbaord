@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  b2b-dashboard:
+    container_name: b2b-dashboard
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      - "3003:80"
