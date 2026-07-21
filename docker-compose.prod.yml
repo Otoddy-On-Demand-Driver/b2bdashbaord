@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   b2b-dashboard:
     container_name: b2b-dashboard
@@ -8,7 +6,15 @@ services:
       context: .
       dockerfile: Dockerfile
 
+    image: b2b-dashboard:latest
+
     restart: unless-stopped
 
     ports:
       - "3003:80"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
