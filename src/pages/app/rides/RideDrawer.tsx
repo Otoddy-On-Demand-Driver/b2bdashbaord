@@ -1,6 +1,6 @@
 // src/pages/ops/rides/RideDrawer.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   CheckCircle2,
@@ -16,6 +16,8 @@ import {
   MessageSquare,
   FileDown, // ✅ add
   ReceiptText, // ✅ add
+  LocateFixed, // ✅ map recenter button
+  Maximize, // ✅ map fit-to-screen button
 } from "lucide-react";
 import {
   opsGetRide,
@@ -192,10 +194,80 @@ function Field({ label, value }: { label: string; value: any }) {
 
 function Recenter({ center }: { center: [number, number] }) {
   const map = useMap();
+  const hasCenteredOnce = useRef(false);
+
   useEffect(() => {
+    // ✅ only auto-center the FIRST time we get a valid center.
+    // After that, the user can freely pan/zoom without the map
+    // snapping back on every driver GPS update — they can use the
+    // Recenter / Fit-to-screen buttons instead (like Google Maps).
+    if (hasCenteredOnce.current) return;
+    hasCenteredOnce.current = true;
     map.setView(center, map.getZoom(), { animate: true });
   }, [center[0], center[1]]);
+
   return null;
+}
+
+/* ----------------------------- Map controls (Google-Maps style) ----------------------------- */
+function MapControls({
+  driverLoc,
+  pickup,
+  drop,
+}: {
+  driverLoc: { lat: number; lng: number } | null;
+  pickup: { lat: number; lng: number } | null;
+  drop: { lat: number; lng: number } | null;
+}) {
+  const map = useMap();
+
+  function recenterToDriver() {
+    if (driverLoc) {
+      map.flyTo([driverLoc.lat, driverLoc.lng], Math.max(map.getZoom(), 15), { animate: true });
+    } else if (pickup) {
+      map.flyTo([pickup.lat, pickup.lng], Math.max(map.getZoom(), 15), { animate: true });
+    }
+  }
+
+  function fitToScreen() {
+    const pts: [number, number][] = [];
+    if (pickup) pts.push([pickup.lat, pickup.lng]);
+    if (drop) pts.push([drop.lat, drop.lng]);
+    if (driverLoc) pts.push([driverLoc.lat, driverLoc.lng]);
+
+    if (pts.length === 0) return;
+
+    if (pts.length === 1) {
+      map.flyTo(pts[0], 15, { animate: true });
+      return;
+    }
+
+    const bounds = L.latLngBounds(pts);
+    map.flyToBounds(bounds, { padding: [56, 56], animate: true });
+  }
+
+  return (
+    <div className="absolute bottom-4 right-4 z-[999] flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={recenterToDriver}
+        disabled={!driverLoc && !pickup}
+        title="Recenter to driver"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50 disabled:opacity-40"
+      >
+        <LocateFixed size={18} className="text-slate-700" />
+      </button>
+
+      <button
+        type="button"
+        onClick={fitToScreen}
+        title="Fit to screen"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50"
+      >
+        <Maximize size={18} className="text-slate-700" />
+      </button>
+    </div>
+  );
 }
 
 /* ----------------------------- CSV helpers ----------------------------- */
@@ -1049,6 +1121,13 @@ export default function RideDrawer({
                     }
                   />
                 ) : null}
+
+                {/* ✅ Google-Maps-style recenter + fit-to-screen buttons */}
+                <MapControls
+                  driverLoc={liveDriverLoc}
+                  pickup={pickupOk ? { lat: pickupLat, lng: pickupLng } : null}
+                  drop={dropOk ? { lat: dropLat, lng: dropLng } : null}
+                />
               </MapContainer>
 
               {/* Overlay badge */}
