@@ -981,10 +981,15 @@ export default function RideDrawer({
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="Close" />
 
-      {/* ✅ FULL SCREEN LAYOUT: LEFT MAP + RIGHT DRAWER */}
-      <div className="absolute inset-0 flex">
-        {/* LEFT: LIVE MAP (Desktop only) */}
-        <div className="hidden md:block flex-1 relative">
+      {/*
+        ✅ FULL SCREEN LAYOUT: MAP + DRAWER
+        - Mobile/Tablet (<md): stacked vertically -> map on top (fixed height), drawer below (scrolls)
+        - Desktop (>=md): side-by-side -> map takes remaining space (left), drawer fixed width (right)
+        Map now renders on ALL breakpoints (Android, iPhone, tablet, PC) — no more `hidden md:block`.
+      */}
+      <div className="absolute inset-0 flex flex-col md:flex-row">
+        {/* MAP (shows on every device now) */}
+        <div className="relative h-[42vh] shrink-0 md:h-auto md:flex-1">
           {isOngoing ? (
             <>
               <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }}>
@@ -1047,7 +1052,7 @@ export default function RideDrawer({
               </MapContainer>
 
               {/* Overlay badge */}
-              <div className="absolute top-4 left-4 rounded-2xl bg-white/95 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 shadow">
+              <div className="absolute top-4 left-4 max-w-[calc(100%-2rem)] rounded-2xl bg-white/95 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 shadow">
                 Live Tracking • {r.AssignedDriver?.name || "Driver"}
                 <div className="mt-0.5 text-[11px] font-semibold text-slate-500">
                   {liveDriverLoc
@@ -1069,16 +1074,16 @@ export default function RideDrawer({
               </div>
             </>
           ) : (
-            <div className="h-full w-full flex items-center justify-center text-sm text-slate-300">
+            <div className="h-full w-full flex items-center justify-center text-sm text-slate-400 bg-slate-50">
               Map shows only for ongoing rides
             </div>
           )}
         </div>
 
-        {/* RIGHT: DRAWER */}
-        <div className="h-full w-full sm:w-[620px] bg-white shadow-xl">
+        {/* RIGHT / BOTTOM: DRAWER */}
+        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl md:w-[620px] md:flex-none">
           {/* Header */}
-          <div className="h-16 border-b border-slate-200 px-5 flex items-center justify-between">
+          <div className="h-16 shrink-0 border-b border-slate-200 px-5 flex items-center justify-between">
             <div className="min-w-0">
               <div className="text-sm font-extrabold text-slate-900">Ride Details</div>
               <div className="text-xs text-slate-500 truncate">{r?._id || "—"}</div>
@@ -1099,7 +1104,7 @@ export default function RideDrawer({
           ) : !ride ? (
             <div className="p-5 text-sm text-slate-600">No data</div>
           ) : (
-            <div className="h-[calc(100%-64px)] overflow-auto p-5 space-y-5">
+            <div className="min-h-0 flex-1 overflow-auto p-5 space-y-5">
               {/* 🚨 EMERGENCY BLOCK */}
               {showEmergencyBanner ? (
                 <div className="rounded-3xl border border-red-300 bg-red-50 p-4">
