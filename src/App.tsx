@@ -19,7 +19,7 @@ import PaymentsPage from "./pages/app/PaymentsPage";
 import SettingsPage from "./pages/app/SettingsPage";
 import UsersPage from "./pages/app/users/UsersPage";
 import ManageUsersPage from "./pages/app/admin/ManageUsersPage";
-
+import RideTrackPage from "./pages/app/rides/RideTrackPage";
 import CreateBooking from "./pages/CreateBooking";
 import B2BRidesPage from "./pages/b2b/B2BRidesPage";
 
@@ -47,6 +47,8 @@ export default function App() {
 
             {/* General (logged-in) */}
             <Route path="rides" element={<RidesPage />} />
+            <Route path="rides/:rideId/track" element={<RideTrackPage />} />   {/* ✅ add this */}
+
             <Route path="rides/create" element={<CreateBooking />} />
             <Route path="payments" element={<PaymentsPage />} />
 

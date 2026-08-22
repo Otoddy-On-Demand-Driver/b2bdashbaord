@@ -84,6 +84,9 @@ function isRideActive(status: any) {
 }
 
 // Fit bounds helper
+// Fit bounds helper — ✅ ab sirf PEHLI BAAR fit karta hai jab valid points milte hain.
+// Uske baad live driver-location updates se map apne aap zoom/pan/reset nahi hoga.
+// User manually zoom/pan kar sakta hai bina disturb hue.
 function FitToBounds({
   points,
   padding = [40, 40],
@@ -92,13 +95,18 @@ function FitToBounds({
   padding?: [number, number];
 }) {
   const map = useMap();
+  const hasFitOnceRef = useRef(false);
+
   useEffect(() => {
     if (!map) return;
+    if (hasFitOnceRef.current) return; // ✅ already fit once, skip forever
     if (!points || points.length === 0) return;
 
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
     map.fitBounds(bounds, { padding });
+    hasFitOnceRef.current = true; // ✅ lock — future live updates won't re-trigger fit
   }, [map, points, padding]);
+
   return null;
 }
 

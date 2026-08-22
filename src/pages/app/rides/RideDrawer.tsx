@@ -1,6 +1,7 @@
-// src/pages/ops/rides/RideDrawer.tsx
+// src/pages/app/rides/RideDrawer.tsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ add: for Live Track full-page redirect
 import {
   X,
   CheckCircle2,
@@ -16,8 +17,7 @@ import {
   MessageSquare,
   FileDown, // ✅ add
   ReceiptText, // ✅ add
-  LocateFixed, // ✅ map recenter button
-  Maximize, // ✅ map fit-to-screen button
+  Maximize, // ✅ used for the View Live Map button
 } from "lucide-react";
 import {
   opsGetRide,
@@ -39,24 +39,9 @@ import {
   type Ride,
 } from "../../../lib/opsApi";
 import { apiErrorMessage } from "../../../lib/api";
-import { useMap } from "react-leaflet";
 
 // ✅ SOCKET (your existing socket.ts)
 import { socket } from "../../../lib/socket";
-
-// ✅ MAP (Leaflet)
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-/* ----------------------------- Leaflet marker fix ----------------------------- */
-const pinIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
 
 /* ----------------------------- Utils ----------------------------- */
 function isNum(v: any): v is number {
@@ -192,84 +177,6 @@ function Field({ label, value }: { label: string; value: any }) {
   );
 }
 
-function Recenter({ center }: { center: [number, number] }) {
-  const map = useMap();
-  const hasCenteredOnce = useRef(false);
-
-  useEffect(() => {
-    // ✅ only auto-center the FIRST time we get a valid center.
-    // After that, the user can freely pan/zoom without the map
-    // snapping back on every driver GPS update — they can use the
-    // Recenter / Fit-to-screen buttons instead (like Google Maps).
-    if (hasCenteredOnce.current) return;
-    hasCenteredOnce.current = true;
-    map.setView(center, map.getZoom(), { animate: true });
-  }, [center[0], center[1]]);
-
-  return null;
-}
-
-/* ----------------------------- Map controls (Google-Maps style) ----------------------------- */
-function MapControls({
-  driverLoc,
-  pickup,
-  drop,
-}: {
-  driverLoc: { lat: number; lng: number } | null;
-  pickup: { lat: number; lng: number } | null;
-  drop: { lat: number; lng: number } | null;
-}) {
-  const map = useMap();
-
-  function recenterToDriver() {
-    if (driverLoc) {
-      map.flyTo([driverLoc.lat, driverLoc.lng], Math.max(map.getZoom(), 15), { animate: true });
-    } else if (pickup) {
-      map.flyTo([pickup.lat, pickup.lng], Math.max(map.getZoom(), 15), { animate: true });
-    }
-  }
-
-  function fitToScreen() {
-    const pts: [number, number][] = [];
-    if (pickup) pts.push([pickup.lat, pickup.lng]);
-    if (drop) pts.push([drop.lat, drop.lng]);
-    if (driverLoc) pts.push([driverLoc.lat, driverLoc.lng]);
-
-    if (pts.length === 0) return;
-
-    if (pts.length === 1) {
-      map.flyTo(pts[0], 15, { animate: true });
-      return;
-    }
-
-    const bounds = L.latLngBounds(pts);
-    map.flyToBounds(bounds, { padding: [56, 56], animate: true });
-  }
-
-  return (
-    <div className="absolute bottom-4 right-4 z-[999] flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={recenterToDriver}
-        disabled={!driverLoc && !pickup}
-        title="Recenter to driver"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50 disabled:opacity-40"
-      >
-        <LocateFixed size={18} className="text-slate-700" />
-      </button>
-
-      <button
-        type="button"
-        onClick={fitToScreen}
-        title="Fit to screen"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50"
-      >
-        <Maximize size={18} className="text-slate-700" />
-      </button>
-    </div>
-  );
-}
-
 /* ----------------------------- CSV helpers ----------------------------- */
 function csvEscape(v: any) {
   const s = String(v ?? "");
@@ -303,6 +210,8 @@ export default function RideDrawer({
   onClose: () => void;
   onMutated: () => void;
 }) {
+  const navigate = useNavigate(); // ✅ add: for Live Track redirect
+
   const [ride, setRide] = useState<Ride | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1041,14 +950,6 @@ export default function RideDrawer({
       )
       : null;
 
-  // Map center fallback
-  const mapCenter: [number, number] =
-    liveDriverLoc
-      ? [liveDriverLoc.lat, liveDriverLoc.lng]
-      : pickupOk
-        ? [pickupLat, pickupLng]
-        : [28.6139, 77.209];
-
   return (
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="Close" />
@@ -1059,117 +960,31 @@ export default function RideDrawer({
         - Desktop (>=md): side-by-side -> map takes remaining space (left), drawer fixed width (right)
         Map now renders on ALL breakpoints (Android, iPhone, tablet, PC) — no more `hidden md:block`.
       */}
-      <div className="absolute inset-0 flex flex-col md:flex-row">
-        {/* MAP (shows on every device now) */}
-        <div className="relative h-[42vh] shrink-0 md:h-auto md:flex-1">
-          {isOngoing ? (
-            <>
-              <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }}>
-                <Recenter center={mapCenter} />
-                <TileLayer
-                  attribution="&copy; OpenStreetMap contributors"
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-
-                {pickupOk ? (
-                  <Marker icon={pinIcon} position={[pickupLat, pickupLng]}>
-                    <Popup>Pickup</Popup>
-                  </Marker>
-                ) : null}
-
-                {dropOk ? (
-                  <Marker icon={pinIcon} position={[dropLat, dropLng]}>
-                    <Popup>Drop</Popup>
-                  </Marker>
-                ) : null}
-
-                {liveDriverLoc ? (
-                  <Marker icon={pinIcon} position={[liveDriverLoc.lat, liveDriverLoc.lng]}>
-                    <Popup>Driver (Live)</Popup>
-                  </Marker>
-                ) : null}
-
-                {/* ✅ Nearest drivers markers (from pickup) */}
-                {pickupOk
-                  ? nearestDrivers.map((d) => (
-                    <Marker key={d.driverId} icon={pinIcon} position={[d.lat, d.lng]}>
-                      <Popup>
-                        Nearest Driver
-                        <br />
-                        {d.name || "Unknown"} • {d.phone || "—"}
-                        <br />
-                        {d.kmFromPickup.toFixed(2)} km from pickup
-                      </Popup>
-                    </Marker>
-                  ))
-                  : null}
-
-                {/* Route line */}
-                {pickupOk && dropOk ? (
-                  <Polyline
-                    positions={
-                      liveDriverLoc
-                        ? [
-                          [pickupLat, pickupLng],
-                          [liveDriverLoc.lat, liveDriverLoc.lng],
-                          [dropLat, dropLng],
-                        ]
-                        : [
-                          [pickupLat, pickupLng],
-                          [dropLat, dropLng],
-                        ]
-                    }
-                  />
-                ) : null}
-
-                {/* ✅ Google-Maps-style recenter + fit-to-screen buttons */}
-                <MapControls
-                  driverLoc={liveDriverLoc}
-                  pickup={pickupOk ? { lat: pickupLat, lng: pickupLng } : null}
-                  drop={dropOk ? { lat: dropLat, lng: dropLng } : null}
-                />
-              </MapContainer>
-
-              {/* Overlay badge */}
-              <div className="absolute top-4 left-4 max-w-[calc(100%-2rem)] rounded-2xl bg-white/95 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 shadow">
-                Live Tracking • {r.AssignedDriver?.name || "Driver"}
-                <div className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                  {liveDriverLoc
-                    ? `${liveDriverLoc.lat.toFixed(5)}, ${liveDriverLoc.lng.toFixed(5)}`
-                    : "Waiting for GPS..."}
-                </div>
-
-                <div className="mt-2 text-[11px] font-semibold text-slate-600 space-y-0.5">
-                  <div>Pickup → Drop: {fmtKm(pickupToDropKm)}</div>
-                  <div>Driver → Pickup: {fmtKm(driverToPickupKm)}</div>
-                  <div>Driver → Drop: {fmtKm(driverToDropKm)}</div>
-                  {nearestDrivers[0] ? (
-                    <div>
-                      Nearest: {nearestDrivers[0].name || "Unknown"} • {nearestDrivers[0].phone || "—"} •{" "}
-                      {fmtKm(nearestDrivers[0].kmFromPickup)}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="h-full w-full flex items-center justify-center text-sm text-slate-400 bg-slate-50">
-              Map shows only for ongoing rides
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT / BOTTOM: DRAWER */}
-        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl md:w-[620px] md:flex-none">
+      <div className="absolute inset-0 flex flex-col">
+        {/* DRAWER (full screen, no inline map — use "View Live Map" button instead) */}
+        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl">
           {/* Header */}
-          <div className="h-16 shrink-0 border-b border-slate-200 px-5 flex items-center justify-between">
+          <div className="h-16 shrink-0 border-b border-slate-200 px-5 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-extrabold text-slate-900">Ride Details</div>
               <div className="text-xs text-slate-500 truncate">{r?._id || "—"}</div>
             </div>
-            <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
-              <X />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {isOngoing ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/rides/${rideId}/track`)}
+                  className="flex items-center gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  title="Open full-screen live map"
+                >
+                  <Maximize size={14} />
+                  View Live Map
+                </button>
+              ) : null}
+              <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
+                <X />
+              </button>
+            </div>
           </div>
 
           {loading ? (
