@@ -1,6 +1,6 @@
 // src/pages/app/rides/RideDrawer.tsx
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo,  useState } from "react";
 import { useNavigate } from "react-router-dom"; // ✅ add: for Live Track full-page redirect
 import {
   X,
