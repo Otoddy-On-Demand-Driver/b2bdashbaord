@@ -18,6 +18,7 @@ import {
   FileDown, // ✅ add
   ReceiptText, // ✅ add
   Maximize, // ✅ used for the View Live Map button
+  Search, // ✅ add: driver search box icon
 } from "lucide-react";
 import {
   opsGetRide,
@@ -141,6 +142,27 @@ function fmtKm(v: any) {
   return Number.isFinite(n) ? `${n.toFixed(2)} km` : "—";
 }
 
+/**
+ * ✅ Driver eligibility check.
+ * Based on the actual `Driver` type in opsApi.ts, which has:
+ *   isVerified: boolean
+ *   isApproved: boolean
+ * There's no separate "banned" field in that type — an unapproved /
+ * unverified driver is what we treat as ineligible to assign / show as
+ * nearest. If a "banned" flag gets added to the schema later, add a check
+ * for it here (e.g. `if (d.isBanned) return false;`).
+ */
+function isDriverEligible(d: any) {
+  if (!d) return false;
+  if (d.isApproved === false) return false;
+  if (d.isVerified === false) return false;
+  return true;
+}
+
+function driverIdOf(d: any) {
+  return String((d as any)?._id || (d as any)?.id || (d as any)?.driverId || "");
+}
+
 /* ----------------------------- UI bits ----------------------------- */
 function Badge({
   tone = "slate",
@@ -225,6 +247,8 @@ export default function RideDrawer({
   const [manualMode, setManualMode] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
+  // ✅ driver search (assign modal)
+  const [driverSearch, setDriverSearch] = useState("");
 
   // ✅ ops review
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -324,6 +348,32 @@ export default function RideDrawer({
     return m;
   }, [drivers, r?.AssignedDriver]);
 
+  // ✅ eligible drivers only (not banned / not unapproved)
+  const eligibleDrivers = useMemo(() => {
+    return (drivers || []).filter((d: any) => isDriverEligible(d));
+  }, [drivers]);
+
+  // ✅ quick lookup set of eligible driver ids (used to filter nearest-drivers list too)
+  const eligibleDriverIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of eligibleDrivers) {
+      const id = driverIdOf(d);
+      if (id) s.add(id);
+    }
+    return s;
+  }, [eligibleDrivers]);
+
+  // ✅ search-filtered list shown inside the Assign Driver modal
+  const filteredDrivers = useMemo(() => {
+    const q = driverSearch.trim().toLowerCase();
+    if (!q) return eligibleDrivers;
+    return eligibleDrivers.filter((d: any) => {
+      const name = String(d.name || "").toLowerCase();
+      const phone = String(d.phoneNumber || d.number || d.phone || "").toLowerCase();
+      return name.includes(q) || phone.includes(q);
+    });
+  }, [eligibleDrivers, driverSearch]);
+
   // ✅ coords
   const pickupLat = r.changed_pickup_latitude ?? r.pickup_latitude;
   const pickupLng = r.changed_pickup_longitude ?? r.pickup_longitude;
@@ -398,6 +448,29 @@ export default function RideDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rideId]);
 
+  // ✅ Load available drivers as soon as the drawer opens (not just when the
+  // Assign modal is opened). This is needed so "Nearest Drivers" can be
+  // filtered against eligibility (not banned / approved) even before the
+  // user opens the Assign Driver modal.
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const resp = await opsAvailableDrivers();
+        if (!cancelled) setDrivers(resp.availableDrivers || []);
+      } catch {
+        // silent — nearest-driver filtering just won't restrict until this loads
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, rideId]);
+
   async function doApprove() {
     if (!rideId) return;
     setBusy(true);
@@ -434,6 +507,7 @@ export default function RideDrawer({
     setManualMode(false);
     setManualName("");
     setManualPhone("");
+    setDriverSearch(""); // ✅ reset search each time modal opens
     try {
       const resp = await opsAvailableDrivers();
       setDrivers(resp.availableDrivers || []);
@@ -476,6 +550,7 @@ export default function RideDrawer({
       setManualName("");
       setManualPhone("");
       setSelectedDriver("");
+      setDriverSearch("");
 
       await load();
       onMutated();
@@ -639,12 +714,18 @@ export default function RideDrawer({
           }
         }
 
-        // ✅ nearest drivers from pickup
+        // ✅ nearest drivers from pickup — only eligible (not banned / approved) drivers
         if (pickupOk) {
           const pickup = { lat: pickupLat, lng: pickupLng };
 
           const list = coords
             .filter((x: any) => typeof x?.lat === "number" && typeof x?.lng === "number" && x?.driverId)
+            .filter((x: any) => {
+              // if we don't have eligibility data loaded yet, don't hide everyone —
+              // once `drivers` loads this will start filtering correctly
+              if (eligibleDriverIds.size === 0) return true;
+              return eligibleDriverIds.has(String(x.driverId));
+            })
             .map((x: any) => {
               const id = String(x.driverId);
               const km = haversineKm(pickup, { lat: x.lat, lng: x.lng });
@@ -676,7 +757,7 @@ export default function RideDrawer({
     return () => {
       if (t) clearInterval(t);
     };
-  }, [open, driverIdForGps, pickupOk, pickupLat, pickupLng, driverInfoById]);
+  }, [open, driverIdForGps, pickupOk, pickupLat, pickupLng, driverInfoById, eligibleDriverIds]);
 
   // ✅ open review modal (prefill)
   function openReview() {
@@ -1931,18 +2012,51 @@ export default function RideDrawer({
                     </div>
 
                     {!manualMode ? (
-                      <select
-                        value={selectedDriver}
-                        onChange={(e) => setSelectedDriver(e.target.value)}
-                        className="mt-3 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                      >
-                        <option value="">Select driver</option>
-                        {drivers.map((d: any) => (
-                          <option key={d._id} value={d._id}>
-                            {d.name} • {d.phoneNumber || "—"}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="mt-3">
+                        {/* ✅ search box */}
+                        <div className="relative">
+                          <Search
+                            size={16}
+                            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                          <input
+                            type="text"
+                            value={driverSearch}
+                            onChange={(e) => setDriverSearch(e.target.value)}
+                            placeholder="Search driver by name or phone..."
+                            className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                          />
+                        </div>
+
+                        {/* ✅ scrollable, tappable driver list (mobile friendly) */}
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 divide-y divide-slate-100">
+                          {filteredDrivers.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-slate-500">
+                              {drivers.length === 0 ? "Loading drivers..." : "No matching drivers found"}
+                            </div>
+                          ) : (
+                            filteredDrivers.map((d: any) => {
+                              const id = driverIdOf(d);
+                              const active = selectedDriver === id;
+                              return (
+                                <button
+                                  type="button"
+                                  key={id}
+                                  onClick={() => setSelectedDriver(id)}
+                                  className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${
+                                    active ? "bg-slate-900 text-white" : "hover:bg-slate-50 text-slate-900"
+                                  }`}
+                                >
+                                  <span className="font-semibold">{d.name}</span>
+                                  <span className={active ? "text-slate-200" : "text-slate-500"}>
+                                    {d.phoneNumber || d.number || d.phone || "—"}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       <div className="mt-3 space-y-3">
                         <input
