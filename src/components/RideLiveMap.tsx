@@ -22,10 +22,18 @@ function Recenter({ center }: { center: [number, number] }) {
   const map = useMap();
   const done = useRef(false);
   useEffect(() => {
-    if (done.current) return;
+    const t = setTimeout(() => {
+      try {
+        map.invalidateSize();
+      } catch {}
+    }, 150);
+    if (done.current) {
+      return () => clearTimeout(t);
+    }
     done.current = true;
     map.setView(center, map.getZoom(), { animate: true });
-  }, [center[0], center[1]]);
+    return () => clearTimeout(t);
+  }, [center[0], center[1], map]);
   return null;
 }
 

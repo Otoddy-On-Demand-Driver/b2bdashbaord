@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo,  useState } from "react";
 import { useNavigate } from "react-router-dom"; // ✅ add: for Live Track full-page redirect
+import RideLiveMap from "../../../components/RideLiveMap";
 import {
   X,
   CheckCircle2,
@@ -43,6 +44,7 @@ import { apiErrorMessage } from "../../../lib/api";
 
 // ✅ SOCKET (your existing socket.ts)
 import { socket } from "../../../lib/socket";
+import { authStore } from "../../../store/authStore";
 
 /* ----------------------------- Utils ----------------------------- */
 function isNum(v: any): v is number {
@@ -233,6 +235,8 @@ export default function RideDrawer({
   onMutated: () => void;
 }) {
   const navigate = useNavigate(); // ✅ add: for Live Track redirect
+  const user = authStore((s) => s.user);
+  const isAdmin = user?.role === "admin";
 
   const [ride, setRide] = useState<Ride | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -869,12 +873,15 @@ export default function RideDrawer({
       };
 
       const payload: any = {
-        actual_extended_time_duration: toNumOrUndef(extraForm.actual_extended_time_duration),
-        actual_extended_time_fare: toNumOrUndef(extraForm.actual_extended_time_fare),
-        waiting_duration: toNumOrUndef(extraForm.waiting_duration),
-        waiting_charge: toNumOrUndef(extraForm.waiting_charge),
         extended_actual_distance_fare: toNumOrUndef(extraForm.extended_actual_distance_fare),
       };
+
+      if (isAdmin) {
+        payload.actual_extended_time_duration = toNumOrUndef(extraForm.actual_extended_time_duration);
+        payload.actual_extended_time_fare = toNumOrUndef(extraForm.actual_extended_time_fare);
+        payload.waiting_duration = toNumOrUndef(extraForm.waiting_duration);
+        payload.waiting_charge = toNumOrUndef(extraForm.waiting_charge);
+      }
 
       // remove all-undefined
       Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
@@ -943,7 +950,7 @@ export default function RideDrawer({
   // ✅ CSV export for this ride (single row)
   function exportRideCSV() {
     const rr: any = ride || {};
-    const row = {
+    const row: any = {
       rideId: rr?._id || "",
       status: rr?.ride_status || "",
       date: rr?.end_ride_time || rr?.car_handover_time || rr?.createdAt || "",
@@ -959,10 +966,12 @@ export default function RideDrawer({
       incentive_amount: rr?.insentive_amount ?? "",
       TA_fare: rr?.TAFare ?? "",
       TA_description: rr?.TADescription ?? "",
-      actual_extended_time_duration: rr?.actual_extended_time_duration ?? "",
-      actual_extended_time_fare: rr?.actual_extended_time_fare ?? "",
-      waiting_duration: rr?.waiting_duration ?? "",
-      waiting_charge: rr?.waiting_charge ?? "",
+      ...(isAdmin ? {
+        actual_extended_time_duration: rr?.actual_extended_time_duration ?? "",
+        actual_extended_time_fare: rr?.actual_extended_time_fare ?? "",
+        waiting_duration: rr?.waiting_duration ?? "",
+        waiting_charge: rr?.waiting_charge ?? "",
+      } : {}),
       extended_actual_distance_fare: rr?.extended_actual_distance_fare ?? "",
       start_images_count: Array.isArray(rr?.start_car_images) ? rr.start_car_images.length : 0,
       end_images_count: Array.isArray(rr?.end_car_images) ? rr.end_car_images.length : 0,
@@ -1041,9 +1050,34 @@ export default function RideDrawer({
         - Desktop (>=md): side-by-side -> map takes remaining space (left), drawer fixed width (right)
         Map now renders on ALL breakpoints (Android, iPhone, tablet, PC) — no more `hidden md:block`.
       */}
-      <div className="absolute inset-0 flex flex-col">
-        {/* DRAWER (full screen, no inline map — use "View Live Map" button instead) */}
-        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl">
+      <div className="absolute inset-0 flex flex-col lg:flex-row">
+        {/* MAP: 40% width on left, visible ONLY on laptop/desktop (lg:), hidden on mobile */}
+        <div className="hidden lg:flex lg:w-[40%] relative h-full flex-col bg-slate-100 border-r border-slate-200 overflow-hidden shrink-0">
+          {isOngoing || pickupOk || dropOk ? (
+            <RideLiveMap
+              heightClass="h-full"
+              driverName={r?.AssignedDriver?.name}
+              pickupOk={pickupOk}
+              pickupLat={pickupLat}
+              pickupLng={pickupLng}
+              dropOk={dropOk}
+              dropLat={dropLat}
+              dropLng={dropLng}
+              liveDriverLoc={liveDriverLoc}
+              nearestDrivers={nearestDrivers}
+              pickupToDropKm={pickupToDropKm}
+              driverToPickupKm={driverToPickupKm}
+              driverToDropKm={driverToDropKm}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center p-6 text-center text-sm text-slate-400 bg-slate-50">
+              Map unavailable for this ride
+            </div>
+          )}
+        </div>
+
+        {/* DRAWER / DETAILS: 60% on laptop/desktop (lg:), 100% full-width on mobile */}
+        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl lg:w-[60%] lg:flex-none">
           {/* Header */}
           <div className="h-16 shrink-0 border-b border-slate-200 px-5 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -1055,7 +1089,7 @@ export default function RideDrawer({
                 <button
                   type="button"
                   onClick={() => navigate(`/rides/${rideId}/track`)}
-                  className="flex items-center gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  className="lg:hidden flex items-center gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                   title="Open full-screen live map"
                 >
                   <Maximize size={14} />
@@ -1665,8 +1699,12 @@ export default function RideDrawer({
                   <Field label="Total Fare" value={money(r.total_fare)} />
                   <Field label="Incentive" value={money(r.insentive_amount)} />
 
-                  <Field label="Extended Time Fare (estimate)" value={money(r.extended_time_fare)} />
-                  <Field label="Extended Time Duration (estimate)" value={num(r.extended_time_duration)} />
+                  {isAdmin && (
+                    <>
+                      <Field label="Extended Time Fare (estimate)" value={money(r.extended_time_fare)} />
+                      <Field label="Extended Time Duration (estimate)" value={num(r.extended_time_duration)} />
+                    </>
+                  )}
 
                   <Field label="Time Estimations (mins?)" value={num(r.time_estimations)} />
                   <Field label="Distance Estimation" value={num(r.distance_estimation)} />
@@ -1679,18 +1717,22 @@ export default function RideDrawer({
                     <Field label="TA Fare" value={money(r.TAFare)} />
                     <Field label="TA Description" value={r.TADescription || "—"} />
 
-                    <Field label="Actual Extended Time (mins)" value={num(r.actual_extended_time_duration)} />
-                    <Field label="Actual Extended Time Fare" value={money(r.actual_extended_time_fare)} />
+                    {isAdmin && (
+                      <>
+                        <Field label="Actual Extended Time (mins)" value={num(r.actual_extended_time_duration)} />
+                        <Field label="Actual Extended Time Fare" value={money(r.actual_extended_time_fare)} />
 
-                    <Field label="Waiting Duration (mins)" value={num(r.waiting_duration)} />
-                    <Field label="Waiting Charge" value={money(r.waiting_charge)} />
+                        <Field label="Waiting Duration (mins)" value={num(r.waiting_duration)} />
+                        <Field label="Waiting Charge" value={money(r.waiting_charge)} />
+                      </>
+                    )}
 
                     <Field label="Extra Distance Fare" value={money(r.extended_actual_distance_fare)} />
                     <Field
                       label="Extra Total (sum)"
                       value={money(
-                        Number(r.actual_extended_time_fare || 0) +
-                        Number(r.waiting_charge || 0) +
+                        (isAdmin ? Number(r.actual_extended_time_fare || 0) : 0) +
+                        (isAdmin ? Number(r.waiting_charge || 0) : 0) +
                         Number(r.extended_actual_distance_fare || 0) +
                         Number(r.TAFare || 0)
                       )}
@@ -2332,65 +2374,69 @@ export default function RideDrawer({
                     </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-3">
-                      <label className="text-xs font-semibold text-slate-600">
-                        Actual Extended Time Duration (mins)
-                        <input
-                          value={extraForm.actual_extended_time_duration}
-                          onChange={(e) =>
-                            setExtraForm((p) => ({
-                              ...p,
-                              actual_extended_time_duration: e.target.value.replace(/[^\d]/g, ""),
-                            }))
-                          }
-                          placeholder="0"
-                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                        />
-                      </label>
+                      {isAdmin && (
+                        <>
+                          <label className="text-xs font-semibold text-slate-600">
+                            Actual Extended Time Duration (mins)
+                            <input
+                              value={extraForm.actual_extended_time_duration}
+                              onChange={(e) =>
+                                setExtraForm((p) => ({
+                                  ...p,
+                                  actual_extended_time_duration: e.target.value.replace(/[^\d]/g, ""),
+                                }))
+                              }
+                              placeholder="0"
+                              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                            />
+                          </label>
 
-                      <label className="text-xs font-semibold text-slate-600">
-                        Actual Extended Time Fare (₹)
-                        <input
-                          value={extraForm.actual_extended_time_fare}
-                          onChange={(e) =>
-                            setExtraForm((p) => ({
-                              ...p,
-                              actual_extended_time_fare: e.target.value.replace(/[^\d]/g, ""),
-                            }))
-                          }
-                          placeholder="0"
-                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                        />
-                      </label>
+                          <label className="text-xs font-semibold text-slate-600">
+                            Actual Extended Time Fare (₹)
+                            <input
+                              value={extraForm.actual_extended_time_fare}
+                              onChange={(e) =>
+                                setExtraForm((p) => ({
+                                  ...p,
+                                  actual_extended_time_fare: e.target.value.replace(/[^\d]/g, ""),
+                                }))
+                              }
+                              placeholder="0"
+                              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                            />
+                          </label>
 
-                      <label className="text-xs font-semibold text-slate-600">
-                        Waiting Duration (mins)
-                        <input
-                          value={extraForm.waiting_duration}
-                          onChange={(e) =>
-                            setExtraForm((p) => ({
-                              ...p,
-                              waiting_duration: e.target.value.replace(/[^\d]/g, ""),
-                            }))
-                          }
-                          placeholder="0"
-                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                        />
-                      </label>
+                          <label className="text-xs font-semibold text-slate-600">
+                            Waiting Duration (mins)
+                            <input
+                              value={extraForm.waiting_duration}
+                              onChange={(e) =>
+                                setExtraForm((p) => ({
+                                  ...p,
+                                  waiting_duration: e.target.value.replace(/[^\d]/g, ""),
+                                }))
+                              }
+                              placeholder="0"
+                              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                            />
+                          </label>
 
-                      <label className="text-xs font-semibold text-slate-600">
-                        Waiting Charge (₹)
-                        <input
-                          value={extraForm.waiting_charge}
-                          onChange={(e) =>
-                            setExtraForm((p) => ({
-                              ...p,
-                              waiting_charge: e.target.value.replace(/[^\d]/g, ""),
-                            }))
-                          }
-                          placeholder="0"
-                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
-                        />
-                      </label>
+                          <label className="text-xs font-semibold text-slate-600">
+                            Waiting Charge (₹)
+                            <input
+                              value={extraForm.waiting_charge}
+                              onChange={(e) =>
+                                setExtraForm((p) => ({
+                                  ...p,
+                                  waiting_charge: e.target.value.replace(/[^\d]/g, ""),
+                                }))
+                              }
+                              placeholder="0"
+                              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                            />
+                          </label>
+                        </>
+                      )}
 
                       <label className="text-xs font-semibold text-slate-600">
                         Extra Distance Fare (₹)
@@ -2412,8 +2458,8 @@ export default function RideDrawer({
                           <span className="text-xs font-semibold text-slate-500">Sum</span>
                           <span className="font-extrabold text-slate-900">
                             {money(
-                              Number(extraForm.actual_extended_time_fare || 0) +
-                              Number(extraForm.waiting_charge || 0) +
+                              (isAdmin ? Number(extraForm.actual_extended_time_fare || 0) : 0) +
+                              (isAdmin ? Number(extraForm.waiting_charge || 0) : 0) +
                               Number(extraForm.extended_actual_distance_fare || 0)
                             )}
                           </span>
