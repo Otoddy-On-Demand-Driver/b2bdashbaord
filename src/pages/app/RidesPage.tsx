@@ -8,6 +8,7 @@ import {
   opsRidesByDate,
   type Ride,
   type RideStatus,
+  type RideListMeta,
 } from "../../lib/opsApi";
 import { apiErrorMessage } from "../../lib/api";
 import Chip from "../../components/ui/Chip";
@@ -17,6 +18,7 @@ import { AlertTriangle } from "lucide-react";
 // ✅ socket helper (create this if not present)
 import { socket } from "../../lib/socket";
 import { api } from "../../lib/api"; // ✅ add (same axios instance)
+import { authStore } from "../../store/authStore";
 
 const API_BASE = (api as any)?.defaults?.baseURL || "";
 
@@ -58,15 +60,26 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function daysAgoISO(days: number) {
+  const value = new Date();
+  value.setDate(value.getDate() - days);
+  return value.toISOString().slice(0, 10);
+}
+
 
 
 export default function RidesPage() {
+  const user = authStore((state) => state.user);
+  const isOpsMember = String(user?.role || "").trim().toLowerCase() === "opsteam";
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("upcoming");
   const [rows, setRows] = useState<Ride[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [meta, setMeta] = useState<RideListMeta | null>(null);
 
   // ✅ date filter state
   const [date, setDate] = useState<string>(todayISO());
@@ -86,21 +99,26 @@ export default function RidesPage() {
     setLoading(true);
     try {
       if (tab === "upcoming") {
-        const r = await opsUpcomingRides();
+        const r = await opsUpcomingRides({ page, limit: pageSize });
         setRows(r.upcomingRides || []);
+        setMeta(r.meta);
       } else if (tab === "ongoing") {
-        const r = await opsOngoingRides();
+        const r = await opsOngoingRides({ page, limit: pageSize });
         setRows(r.ongoingRides || []);
+        setMeta(r.meta);
       } else if (tab === "completed") {
-        const r = await opsCompletedRides();
+        const r = await opsCompletedRides({ page, limit: pageSize });
         setRows(r.completedRides || []);
+        setMeta(r.meta);
       } else if (tab === "cancelled") {
-        const r = await opsCancelledRides();
+        const r = await opsCancelledRides({ page, limit: pageSize });
         setRows(r.cancelledRides || []);
+        setMeta(r.meta);
       } else {
         // byDate
-        const r = await opsRidesByDate(date);
+        const r = await opsRidesByDate(date, { page, limit: pageSize });
         setRows(r.rides || []);
+        setMeta(r.meta);
       }
     } catch (e: any) {
       setErr(apiErrorMessage(e, "Failed to load rides"));
@@ -112,7 +130,7 @@ export default function RidesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, page, pageSize]);
 
   // ✅ if date changes while in byDate tab, auto reload (optional)
   useEffect(() => {
@@ -189,7 +207,10 @@ export default function RidesPage() {
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => {
+                  setPage(1);
+                  setTab(t.key);
+                }}
                 className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
                   tab === t.key ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
                 }`}
@@ -205,6 +226,8 @@ export default function RidesPage() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                min={isOpsMember ? daysAgoISO(7) : undefined}
+                max={isOpsMember ? todayISO() : undefined}
                 className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
               />
               <button
@@ -224,7 +247,7 @@ export default function RidesPage() {
           />
 
           <div className="ml-auto text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">{filtered.length}</span> rides
+            <span className="font-semibold text-slate-900">{meta?.totalItems ?? filtered.length}</span> rides
           </div>
         </div>
 
@@ -349,6 +372,48 @@ export default function RidesPage() {
             ))
           )}
         </div>
+
+        {meta ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Rides per page
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-slate-400"
+              >
+                {[10, 20, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-sm text-slate-600">
+                Page <span className="font-semibold text-slate-900">{meta.page}</span> of <span className="font-semibold text-slate-900">{Math.max(meta.totalPages, 1)}</span>
+              </span>
+              <button
+                type="button"
+                disabled={!meta.hasPrevPage || loading}
+                onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={!meta.hasNextPage || loading}
+                onClick={() => setPage((current) => current + 1)}
+                className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <RideDrawer rideId={activeRideId} open={!!activeRideId} onClose={() => setActiveRideId(null)} onMutated={load} />

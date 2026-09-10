@@ -145,29 +145,39 @@ export async function opsChangeDriverStatus(
 }
 
 
-// Rides lists
-// Rides lists (✅ backend routes use dash)
-export async function opsUpcomingRides() {
-  const { data } = await api.get("/ops/rides-upcoming");
-  return data as { ok: boolean; upcomingRides: Ride[] };
+export type RideListParams = { page?: number; limit?: number };
+
+export type RideListMeta = {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
+// Rides lists (backend routes use dash)
+export async function opsUpcomingRides(params?: RideListParams) {
+  const { data } = await api.get("/ops/rides-upcoming", { params });
+  return data as { ok: boolean; upcomingRides: Ride[]; meta: RideListMeta };
 }
-export async function opsOngoingRides() {
-  const { data } = await api.get("/ops/rides-ongoing");
-  return data as { ok: boolean; ongoingRides: Ride[] };
+export async function opsOngoingRides(params?: RideListParams) {
+  const { data } = await api.get("/ops/rides-ongoing", { params });
+  return data as { ok: boolean; ongoingRides: Ride[]; meta: RideListMeta };
 }
-export async function opsCompletedRides() {
-  const { data } = await api.get("/ops/rides-completed");
-  return data as { ok: boolean; completedRides: Ride[] };
+export async function opsCompletedRides(params?: RideListParams) {
+  const { data } = await api.get("/ops/rides-completed", { params });
+  return data as { ok: boolean; completedRides: Ride[]; meta: RideListMeta };
 }
-export async function opsCancelledRides() {
-  const { data } = await api.get("/ops/rides-cancelled");
-  return data as { ok: boolean; cancelledRides: Ride[] };
+export async function opsCancelledRides(params?: RideListParams) {
+  const { data } = await api.get("/ops/rides-cancelled", { params });
+  return data as { ok: boolean; cancelledRides: Ride[]; meta: RideListMeta };
 }
 
 
-export async function opsRidesByDate(date: string) {
-  const { data } = await api.post("/ops/rides/by-date", { date });
-  return data as { ok: boolean; rides: Ride[] };
+export async function opsRidesByDate(date: string, params?: RideListParams) {
+  const { data } = await api.post("/ops/rides/by-date", { date, ...params });
+  return data as { ok: boolean; rides: Ride[]; meta: RideListMeta };
 }
 
 

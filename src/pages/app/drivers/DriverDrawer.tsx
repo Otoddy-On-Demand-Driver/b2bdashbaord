@@ -12,6 +12,7 @@ import {
   type Driver,
 } from "../../../lib/opsApi";
 import { apiErrorMessage } from "../../../lib/api";
+import { authStore } from "../../../store/authStore";
 
 export default function DriverDrawer({
   open,
@@ -24,6 +25,9 @@ export default function DriverDrawer({
   onClose: () => void;
   onMutated: () => void;
 }) {
+  const user = authStore((state) => state.user);
+  const isAdmin = String(user?.role || "").trim().toLowerCase() === "admin";
+
   const [driver, setDriver] = useState<Driver | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -183,23 +187,27 @@ export default function DriverDrawer({
 
             {/* Primary actions */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <button
-                disabled={busy || isApproved}
-                onClick={approve}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                <BadgeCheck size={18} />
-                {isApproved ? "Already Approved" : "Approve Driver (Complete Verification)"}
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    disabled={busy || isApproved}
+                    onClick={approve}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    <BadgeCheck size={18} />
+                    {isApproved ? "Already Approved" : "Approve Driver (Complete Verification)"}
+                  </button>
 
-              <button
-                disabled={busy || isApproved}
-                onClick={() => setRejectOpen(true)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-              >
-                <UserX2 size={18} />
-                Reject Driver
-              </button>
+                  <button
+                    disabled={busy || isApproved}
+                    onClick={() => setRejectOpen(true)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <UserX2 size={18} />
+                    Reject Driver
+                  </button>
+                </>
+              )}
 
               <button
                 disabled={busy}

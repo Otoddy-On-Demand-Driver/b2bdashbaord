@@ -65,7 +65,9 @@ type BulkCarForm = {
 
 export default function CreateBooking() {
   const user = authStore((state) => state.user);
-  const isVendorAwareRole = user ? ["admin", "opsteam"].includes(user.role) : false;
+  const isVendorAwareRole = user
+    ? ["admin", "opsteam"].some((role) => String(user.role || "").trim().toLowerCase() === role)
+    : false;
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   listInvoices,
+  deleteInvoice,
   generateMonthlyInvoice,
   generatePeriodInvoice,
   openInvoicePdf,
@@ -13,6 +14,7 @@ import {
   type InvoiceStatus,
 } from "../../lib/invoicesApi";
 import { apiErrorMessage } from "../../lib/api";
+import { authStore } from "../../store/authStore";
 
 // ✅ rides APIs (adjust path if needed)
 import {
@@ -129,10 +131,13 @@ function ridesToCSV(rides: Ride[]) {
 
 export default function InvoicesPage() {
   const nav = useNavigate();
+  const user = authStore((state) => state.user);
+  const isAdmin = String(user?.role || "").trim().toLowerCase() === "admin";
 
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // filters
   const [companyId, setCompanyId] = useState("");
@@ -181,6 +186,26 @@ export default function InvoicesPage() {
       setRows([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDeleteInvoice(invoice: Invoice) {
+    if (!isAdmin || !invoice._id) return;
+
+    const confirmed = window.confirm(
+      `Delete invoice ${invoice.invoiceNo}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(invoice._id);
+      setError("");
+      await deleteInvoice(invoice._id);
+      await load();
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -587,6 +612,15 @@ export default function InvoicesPage() {
                       >
                         PDF
                       </button>
+                      {isAdmin ? (
+                        <button
+                          className="border border-red-200 text-red-700 px-2 py-1 rounded hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => handleDeleteInvoice(inv)}
+                          disabled={deletingId === inv._id}
+                        >
+                          {deletingId === inv._id ? "Deleting..." : "Delete"}
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

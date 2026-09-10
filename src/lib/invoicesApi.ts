@@ -54,6 +54,11 @@ export async function getInvoice(invoiceId: string): Promise<Invoice> {
   return data.invoice;
 }
 
+export async function deleteInvoice(invoiceId: string) {
+  const { data } = await api.delete(`/invoices/${invoiceId}`);
+  return data as { ok: boolean; message?: string; invoiceId: string };
+}
+
 /* -------------------- list invoices -------------------- */
 export async function listInvoices(params?: any) {
   const { data } = await api.get("/invoices", { params });

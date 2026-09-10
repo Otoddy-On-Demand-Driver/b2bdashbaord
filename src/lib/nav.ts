@@ -55,7 +55,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "My Rides",
     to: "/b2b/rides",
     icon: CarTaxiFront,
-    roles: ["b2bclient", "admin", "opsteam"],
+    roles: ["b2bclient", "admin"],
   },
 
   // ================= DRIVERS =================
@@ -109,7 +109,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "TA Export",
     to: "/ops/rides/ta-export",
     icon: Download, // ya FileDown
-    roles: ["admin", "opsteam"],
+    roles: ["admin"],
   },
 
   // ================= USERS =================

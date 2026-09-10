@@ -53,7 +53,7 @@ export default function App() {
             <Route path="payments" element={<PaymentsPage />} />
 
             {/* B2B (put behind auth; restrict role if you want) */}
-            <Route element={<RoleGate allow={["admin", "opsteam", "b2bclient"]} />}>
+            <Route element={<RoleGate allow={["admin", "b2bclient"]} />}>
               <Route path="b2b/rides" element={<B2BRidesPage />} />
             </Route>
 
@@ -72,8 +72,11 @@ export default function App() {
               <Route path="drivers" element={<DriversPage />} />
               <Route path="map" element={<MapPage />} />
               <Route path="settings" element={<SettingsPage />} />
-                              <Route path="ops/rides/ta-export" element={<TAExportPage />} />
 
+            </Route>
+
+            <Route element={<RoleGate allow={["admin"]} />}>
+              <Route path="ops/rides/ta-export" element={<TAExportPage />} />
             </Route>
 
             {/* Role-based: admin only */}

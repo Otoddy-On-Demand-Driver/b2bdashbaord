@@ -11,6 +11,7 @@ import {
 import { apiErrorMessage } from "../../lib/api";
 import DriverDrawer from "./drivers/DriverDrawer";
 import { socket } from "../../lib/socket";
+import { authStore } from "../../store/authStore";
 
 type TabKey = "verification" | "all";
 
@@ -100,6 +101,9 @@ function IconButton({
 }
 
 export default function DriversPage() {
+  const user = authStore((state) => state.user);
+  const isAdmin = String(user?.role || "").trim().toLowerCase() === "admin";
+
   const [rows, setRows] = useState<Driver[]>([]);
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
@@ -520,7 +524,7 @@ export default function DriversPage() {
                       </div>
 
                       <div className="col-span-2 flex justify-end gap-2">
-                        {!d.isApproved ? (
+                        {isAdmin && !d.isApproved ? (
                           <>
                             <IconButton
                               onClick={() => openReject(d)}
@@ -635,7 +639,7 @@ export default function DriversPage() {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {!d.isApproved ? (
+                          {isAdmin && !d.isApproved ? (
                             <>
                               <IconButton
                                 onClick={() => openReject(d)}
