@@ -12,6 +12,10 @@ export type CreateRidePayload = {
   drop_latitude: number | string;
   drop_longitude: number | string;
 
+  vendorId?: string;
+  vendorName?: string;
+  companyId?: string;
+
   RideDescription?: string;
   scheduled_time?: string | null;
 
@@ -60,6 +64,10 @@ export type CreateBulkRidePayload = {
   drop_latitude: number | string;
   drop_longitude: number | string;
 
+  vendorId?: string;
+  vendorName?: string;
+  companyId?: string;
+
   RideDescription?: string;
   scheduled_time?: string | null;
 
@@ -84,6 +92,20 @@ export type CreateBulkRidePayload = {
 export async function createBulkRide(payload: CreateBulkRidePayload) {
   const { data } = await api.post("/rides/bulk", payload);
   return data; // { ok, message, rides, errors?, estimations, totalRequested, totalCreated }
+}
+
+export type VendorOption = {
+  vendorId: string;
+  _id?: string;
+  name: string;
+  companyName: string;
+  email?: string;
+  phoneNumber?: string;
+};
+
+export async function getAvailableVendors() {
+  const { data } = await api.get("/rides/vendors");
+  return data as { ok: boolean; count: number; vendors: VendorOption[] };
 }
 
 /* ================= CANCEL ================= */

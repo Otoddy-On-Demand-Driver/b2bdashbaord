@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createRide,
   createBulkRide,
+  getAvailableVendors,
   type CreateRidePayload,
   type CreateBulkRidePayload,
+  type VendorOption,
 } from "../lib/ridesApi";
 import LocationAutocomplete from "../components/LocationAutocomplete";
 import type { OlaSuggestion } from "../lib/geoApi";
+import { authStore } from "../store/authStore";
 
 /** Frontend mirror of backend enums (must match EXACT strings) */
 const BUSINESS_FUNCTION_VALUES = [
@@ -61,9 +64,15 @@ type BulkCarForm = {
 };
 
 export default function CreateBooking() {
+  const user = authStore((state) => state.user);
+  const isVendorAwareRole = user ? ["admin", "opsteam"].includes(user.role) : false;
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<any>(null);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState("");
 
   /** ⭐ mode */
   const [isBulk, setIsBulk] = useState(false);
@@ -105,6 +114,36 @@ export default function CreateBooking() {
     return `${lat},${lng}`;
   }, [form.pickup_latitude, form.pickup_longitude]);
 
+  const selectedVendor = useMemo(
+    () => vendors.find((vendor) => vendor.vendorId === selectedVendorId) ?? null,
+    [selectedVendorId, vendors]
+  );
+
+  useEffect(() => {
+    if (!isVendorAwareRole) {
+      setVendors([]);
+      setSelectedVendorId("");
+      return;
+    }
+
+    let active = true;
+    async function loadVendors() {
+      setVendorsLoading(true);
+      try {
+        const response = await getAvailableVendors();
+        if (!active) return;
+        setVendors(response.vendors || []);
+      } catch (error: any) {
+        if (!active) return;
+        setErr(error?.response?.data?.error || "Unable to load vendor list right now.");
+      } finally {
+        if (active) setVendorsLoading(false);
+      }
+    }
+
+    loadVendors();
+    return () => { active = false; };
+  }, [isVendorAwareRole]);
 
   function addCar() {
     if (cars.length >= 10) return;
@@ -150,6 +189,11 @@ export default function CreateBooking() {
     try {
       setLoading(true);
 
+      if (isVendorAwareRole && !selectedVendorId) {
+        setErr("Please select a vendor before creating this ride.");
+        return;
+      }
+
       const basePayload = {
         pickup_location: form.pickup_location.trim(),
         pickup_latitude: num(form.pickup_latitude),
@@ -157,6 +201,9 @@ export default function CreateBooking() {
         drop_location: form.drop_location.trim(),
         drop_latitude: num(form.drop_latitude),
         drop_longitude: num(form.drop_longitude),
+
+        ...(isVendorAwareRole && selectedVendorId ? { vendorId: selectedVendorId } : {}),
+        ...(isVendorAwareRole && selectedVendor ? { vendorName: selectedVendor.companyName || selectedVendor.name } : {}),
 
         RideDescription: form.RideDescription?.trim() ? form.RideDescription.trim() : undefined,
         scheduled_time: form.scheduled_time ? new Date(form.scheduled_time).toISOString() : null,
@@ -287,6 +334,70 @@ export default function CreateBooking() {
                 </div>
               ) : null}
             </div>
+          )}
+
+          {isVendorAwareRole && (
+            <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Select Vendor</h2>
+                  <p className="mt-1 text-sm text-slate-600">Choose the vendor for this ride before creation.</p>
+                </div>
+                {selectedVendor ? (
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {selectedVendor.companyName || selectedVendor.name} selected
+                  </span>
+                ) : null}
+              </div>
+
+              {vendorsLoading ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                  Loading vendors...
+                </div>
+              ) : vendors.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  No active vendors are available right now.
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {vendors.map((vendor) => {
+                    const isActive = selectedVendorId === vendor.vendorId;
+                    const label = vendor.companyName || vendor.name;
+                    return (
+                      <button
+                        key={vendor.vendorId}
+                        type="button"
+                        onClick={() => setSelectedVendorId(vendor.vendorId)}
+                        className={`rounded-2xl border p-3 text-left transition ${
+                          isActive
+                            ? "border-black bg-black text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-800 hover:border-slate-400"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">{label}</div>
+                            <div className={`mt-1 text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                              {vendor.name}
+                            </div>
+                          </div>
+                          {isActive ? (
+                            <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide">
+                              Selected
+                            </span>
+                          ) : null}
+                        </div>
+                        {vendor.email ? (
+                          <div className={`mt-2 text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                            {vendor.email}
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           )}
 
           <form onSubmit={onSubmit} className="mt-6 space-y-6">
