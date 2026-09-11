@@ -68,6 +68,7 @@ export default function DashboardHome() {
   const user = authStore((s) => s.user);
   const greet = useMemo(() => roleGreeting(user?.role), [user?.role]);
   const b2b = useMemo(() => isB2B(user?.role), [user?.role]);
+  const isAdmin = String(user?.role || "").trim().toLowerCase() === "admin";
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,12 +171,12 @@ export default function DashboardHome() {
         return;
       }
 
-      // OPS/ADMIN: load drivers + withdrawals + earnings
+      // Ops/admin: drivers are shared; payment data is admin-only.
       const [driversRes, withdrawalsRes, earningsRes, totalRes] = await Promise.all([
         opsListDrivers(),
-        opsGetWithdrawals(),
-        opsEarningsByDate(date),
-        opsEarningsTotal(), // ✅ NEW
+        isAdmin ? opsGetWithdrawals() : Promise.resolve({ withdrawals: [] }),
+        isAdmin ? opsEarningsByDate(date) : Promise.resolve({ totalEarnings: 0, ridesCount: 0 }),
+        isAdmin ? opsEarningsTotal() : Promise.resolve({ totalEarnings: 0, ridesCount: 0 }),
       ]);
 
       driversRef.current = new Map((driversRes.drivers || []).map((d: any) => [String(d._id), d]));
@@ -248,11 +249,11 @@ export default function DashboardHome() {
       socket.off("rideStatusChanged", onRideStatusChanged);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [b2b]);
+  }, [b2b, isAdmin]);
 
   // Poll withdrawals + earnings every 30s (OPS/ADMIN only)
   useEffect(() => {
-    if (b2b) return;
+    if (b2b || !isAdmin) return;
 
     const t = setInterval(async () => {
       try {
@@ -286,7 +287,7 @@ export default function DashboardHome() {
     }, 30000);
 
     return () => clearInterval(t);
-  }, [b2b]);
+  }, [b2b, isAdmin]);
 
   return (
     <div className="p-6 space-y-6">
@@ -332,7 +333,7 @@ export default function DashboardHome() {
               <StatCard title="Rides (Completed)" value={stats.ridesCompleted} meta="Finished" />
               <StatCard title="Rides (Cancelled)" value={stats.ridesCancelled} meta="Cancelled" />
             </div>
-          ) : (
+          ) : isAdmin ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <StatCard title="Drivers (Total)" value={stats.driversTotal} meta={`${stats.driversOnline} online`} />
               <StatCard title="Rides (Upcoming)" value={stats.ridesUpcoming} meta="Waiting for approval" />
@@ -347,6 +348,12 @@ export default function DashboardHome() {
                 value={`₹${stats.earningsTotal.toLocaleString("en-IN")}`}
                 meta={`${stats.ridesCountTotal} completed rides`}
               />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <StatCard title="Drivers (Total)" value={stats.driversTotal} meta={`${stats.driversOnline} online`} />
+              <StatCard title="Rides (Upcoming)" value={stats.ridesUpcoming} meta="Waiting for approval" />
+              <StatCard title="Rides (Ongoing)" value={stats.ridesOngoing} meta="In progress" />
             </div>
           )}
 
@@ -371,7 +378,7 @@ export default function DashboardHome() {
                 <div className="mt-3 text-xs text-slate-500">Driver, payment, and earnings info dashboard par hide hai (B2B role).</div>
               </Panel>
             </div>
-          ) : (
+          ) : isAdmin ? (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <Panel title="Drivers">
                 <Row label="Online" value={stats.driversOnline} />
@@ -391,6 +398,20 @@ export default function DashboardHome() {
                 <Row label="Earnings (Today)" value={`₹${stats.earningsToday.toLocaleString("en-IN")}`} />
                 <Row label="Earnings (Total)" value={`₹${stats.earningsTotal.toLocaleString("en-IN")}`} />
                 <div className="mt-3 text-xs text-slate-500">Auto-refresh: 30s • Date: {todayISO()}</div>
+              </Panel>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Panel title="Drivers">
+                <Row label="Online" value={stats.driversOnline} />
+                <Row label="Approved" value={stats.driversApproved} />
+                <Row label="Pending Approval" value={stats.driversPendingApproval} />
+              </Panel>
+
+              <Panel title="Rides">
+                <Row label="Ongoing" value={stats.ridesOngoing} />
+                <Row label="Completed" value={stats.ridesCompleted} />
+                <Row label="Cancelled" value={stats.ridesCancelled} />
               </Panel>
             </div>
           )}

@@ -82,7 +82,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Payments",
     to: "/payments",
     icon: Receipt,
-    roles: ["admin", "opsteam"],
+    roles: ["admin"],
   },
 
   // ================= INVOICES =================
