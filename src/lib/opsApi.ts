@@ -145,7 +145,7 @@ export async function opsChangeDriverStatus(
 }
 
 
-export type RideListParams = { page?: number; limit?: number };
+export type RideListParams = { page?: number; limit?: number; q?: string };
 
 export type RideListMeta = {
   page: number;

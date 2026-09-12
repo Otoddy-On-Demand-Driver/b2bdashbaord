@@ -1,5 +1,5 @@
 // src/pages/ops/RidesPage.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   opsUpcomingRides,
   opsOngoingRides,
@@ -73,6 +73,7 @@ export default function RidesPage() {
   const isOpsMember = String(user?.role || "").trim().toLowerCase() === "opsteam";
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("upcoming");
   const [rows, setRows] = useState<Ride[]>([]);
+  const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -99,24 +100,24 @@ export default function RidesPage() {
     setLoading(true);
     try {
       if (tab === "upcoming") {
-        const r = await opsUpcomingRides({ page, limit: pageSize });
+        const r = await opsUpcomingRides({ page, limit: pageSize, q: q || undefined });
         setRows(r.upcomingRides || []);
         setMeta(r.meta);
       } else if (tab === "ongoing") {
-        const r = await opsOngoingRides({ page, limit: pageSize });
+        const r = await opsOngoingRides({ page, limit: pageSize, q: q || undefined });
         setRows(r.ongoingRides || []);
         setMeta(r.meta);
       } else if (tab === "completed") {
-        const r = await opsCompletedRides({ page, limit: pageSize });
+        const r = await opsCompletedRides({ page, limit: pageSize, q: q || undefined });
         setRows(r.completedRides || []);
         setMeta(r.meta);
       } else if (tab === "cancelled") {
-        const r = await opsCancelledRides({ page, limit: pageSize });
+        const r = await opsCancelledRides({ page, limit: pageSize, q: q || undefined });
         setRows(r.cancelledRides || []);
         setMeta(r.meta);
       } else {
         // byDate
-        const r = await opsRidesByDate(date, { page, limit: pageSize });
+        const r = await opsRidesByDate(date, { page, limit: pageSize, q: q || undefined });
         setRows(r.rides || []);
         setMeta(r.meta);
       }
@@ -130,7 +131,7 @@ export default function RidesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, pageSize]);
+  }, [tab, page, pageSize, q]);
 
   // ✅ if date changes while in byDate tab, auto reload (optional)
   useEffect(() => {
@@ -164,26 +165,12 @@ export default function RidesPage() {
 }, []);
 
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r: any) => {
-      const hay = [
-        r._id,
-        r.pickup_location,
-        r.drop_location,
-        r.ride_status,
-        r.AssignedDriver?.name,
-        r.AssignedDriver?.number,
-        r.car_details?.car_no,
-        r.isEmergency ? "emergency" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(s);
-    });
-  }, [rows, q]);
+  const filtered = rows;
+
+  function submitSearch() {
+    setPage(1);
+    setQ(searchInput.trim());
+  }
 
   return (
     <div className="p-6">
@@ -240,11 +227,21 @@ export default function RidesPage() {
           ) : null}
 
           <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitSearch();
+            }}
             placeholder="Search by booking id, location, driver, car no..."
             className="h-11 w-full md:w-[420px] rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
           />
+          <button
+            type="button"
+            onClick={submitSearch}
+            className="h-11 rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Search
+          </button>
 
           <div className="ml-auto text-sm text-slate-600">
             <span className="font-semibold text-slate-900">{meta?.totalItems ?? filtered.length}</span> rides
