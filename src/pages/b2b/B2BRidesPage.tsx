@@ -8,6 +8,7 @@ import {
   b2bFetchDriverLocation,
   b2bCancelRide, // ✅ NEW
   type Ride,
+  type RideListMeta,
 } from "../../lib/b2bApi";
 import { X, MapPin, Clock, AlertTriangle, User, Car, Briefcase } from "lucide-react";
 
@@ -199,6 +200,9 @@ export default function B2BRidesPage() {
   const [err, setErr] = useState("");
   const [rides, setRides] = useState<Ride[]>([]);
   const [openRideId, setOpenRideId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [meta, setMeta] = useState<RideListMeta>({ page: 1, limit: 20, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false });
 
   // ✅ SEARCH
   const [q, setQ] = useState("");
@@ -209,14 +213,15 @@ export default function B2BRidesPage() {
     try {
       const res =
         tab === "requested"
-          ? await b2bRequestedRides()
+          ? await b2bRequestedRides(q, page, pageSize)
           : tab === "ongoing"
-          ? await b2bOngoingRides()
+          ? await b2bOngoingRides(q, page, pageSize)
           : tab === "cancelled"
-          ? await b2bCancelledRides()
-          : await b2bCompletedRides();
+          ? await b2bCancelledRides(q, page, pageSize)
+          : await b2bCompletedRides(q, page, pageSize);
 
       setRides(res.rides || []);
+      setMeta(res.meta);
     } catch (e: any) {
       setErr(e?.message || "Failed to load rides");
     } finally {
@@ -227,7 +232,7 @@ export default function B2BRidesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, q, page, pageSize]);
 
   const selectedRide = useMemo(
     () => rides.find((r) => String((r as any)._id) === String(openRideId)) || null,
@@ -301,7 +306,10 @@ export default function B2BRidesPage() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setPage(1);
+            }}
             className={[
               "rounded-full px-4 py-2 text-sm font-semibold border",
               tab === t.key
@@ -318,12 +326,15 @@ export default function B2BRidesPage() {
       <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
           placeholder="Search by id, route, status, driver, car no, POC..."
           className="h-11 w-full md:w-[520px] rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
         />
         <div className="md:ml-auto text-sm text-slate-600">
-          <span className="font-semibold text-slate-900">{filteredRides.length}</span> rides
+          <span className="font-semibold text-slate-900">{meta.totalItems}</span> rides
         </div>
       </div>
 
@@ -370,6 +381,46 @@ export default function B2BRidesPage() {
             </button>
           ))
         )}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          Rides per page
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-slate-400"
+          >
+            {[10, 20, 50, 100].map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
+          <span className="text-sm text-slate-600">
+            Page <span className="font-semibold text-slate-900">{meta.page}</span> of <span className="font-semibold text-slate-900">{Math.max(meta.totalPages, 1)}</span>
+          </span>
+          <button
+            type="button"
+            disabled={!meta.hasPrevPage || loading}
+            onClick={() => setPage((current) => Math.max(current - 1, 1))}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            disabled={!meta.hasNextPage || loading}
+            onClick={() => setPage((current) => current + 1)}
+            className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* Drawer */}

@@ -88,24 +88,41 @@ export type Ride = {
 };
 
 // ✅ Backend mounted at /b2bclient (NOT /b2b)
-export async function b2bRequestedRides() {
-  const { data } = await b2bApi.get("/b2bclient/requested-rides");
-  return data as { ok: boolean; rides: Ride[] };
+export type RideListMeta = {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
+export type RideListResponse = { ok: boolean; rides: Ride[]; meta: RideListMeta };
+
+const rideListParams = (q: string, page: number, limit: number) => ({
+  q: q || undefined,
+  page,
+  limit,
+});
+
+export async function b2bRequestedRides(q = "", page = 1, limit = 20) {
+  const { data } = await b2bApi.get("/b2bclient/requested-rides", { params: rideListParams(q, page, limit) });
+  return data as RideListResponse;
 }
 
-export async function b2bOngoingRides() {
-  const { data } = await b2bApi.get("/b2bclient/ongoing-rides");
-  return data as { ok: boolean; rides: Ride[] };
+export async function b2bOngoingRides(q = "", page = 1, limit = 20) {
+  const { data } = await b2bApi.get("/b2bclient/ongoing-rides", { params: rideListParams(q, page, limit) });
+  return data as RideListResponse;
 }
 
-export async function b2bCancelledRides() {
-  const { data } = await b2bApi.get("/b2bclient/cancelled-rides");
-  return data as { ok: boolean; rides: Ride[] };
+export async function b2bCancelledRides(q = "", page = 1, limit = 20) {
+  const { data } = await b2bApi.get("/b2bclient/cancelled-rides", { params: rideListParams(q, page, limit) });
+  return data as RideListResponse;
 }
 
-export async function b2bCompletedRides() {
-  const { data } = await b2bApi.get("/b2bclient/completed-rides");
-  return data as { ok: boolean; rides: Ride[] };
+export async function b2bCompletedRides(q = "", page = 1, limit = 20) {
+  const { data } = await b2bApi.get("/b2bclient/completed-rides", { params: rideListParams(q, page, limit) });
+  return data as RideListResponse;
 }
 
 // keep if used anywhere (even if UI removed)
