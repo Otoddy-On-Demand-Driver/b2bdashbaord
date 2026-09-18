@@ -253,9 +253,8 @@ export default function RidesPage() {
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
         ) : null}
 
-        <div className="portal-surface overflow-x-auto">
-          <div className="min-w-[760px]">
-          <div className="grid grid-cols-12 gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+        <div className="portal-surface overflow-hidden">
+          <div className="hidden grid-cols-12 gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 lg:grid">
             <div className="col-span-4">Route</div>
             <div className="col-span-2">Status</div>
             <div className="col-span-2">Fare</div>
@@ -271,7 +270,7 @@ export default function RidesPage() {
             filtered.map((r: any) => (
               <div
                 key={r._id}
-                className={`grid grid-cols-12 gap-3 border-b border-slate-100 px-5 py-4 hover:bg-slate-50 ${
+                className={`hidden grid-cols-12 gap-3 border-b border-slate-100 px-5 py-4 hover:bg-slate-50 lg:grid ${
                   r.isEmergency ? "bg-red-50/40" : ""
                 }`}
               >
@@ -370,7 +369,75 @@ export default function RidesPage() {
               </div>
             ))
           )}
-          </div>
+
+          {!loading && filtered.length > 0 ? (
+            <div className="lg:hidden">
+              {filtered.map((r: any) => {
+                const imgs = pickImages(r);
+                return (
+                  <div
+                    key={`mobile-${r._id}`}
+                    className={`border-b border-slate-100 p-4 last:border-b-0 ${r.isEmergency ? "bg-red-50/40" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="break-words text-sm font-bold text-slate-950">
+                          {r.pickup_location || "—"} <span className="text-slate-400">to</span> {r.drop_location || "—"}
+                        </div>
+                        <div className="mt-1 break-all text-xs text-slate-500">#{r._id}</div>
+                      </div>
+                      <Chip>{statusLabel(r.ride_status)}</Chip>
+                    </div>
+
+                    {r.isEmergency ? (
+                      <div className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-red-700">
+                        <AlertTriangle size={13} /> Emergency raised by driver
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fare</div>
+                        <div className="mt-1 text-sm font-bold text-slate-950">₹{Math.round(Number(r.fare_estimation || r.total_fare || 0))}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Distance</div>
+                        <div className="mt-1 text-sm font-bold text-slate-950">{r.distance_estimation ? `${Number(r.distance_estimation).toFixed(1)} km` : "—"}</div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Driver</div>
+                        <div className="mt-1 break-words text-sm font-bold text-slate-950">{r.AssignedDriver?.name || "—"}</div>
+                        {r.AssignedDriver?.number ? <div className="break-all text-xs text-slate-500">{r.AssignedDriver.number}</div> : null}
+                      </div>
+                      <div className="flex items-end justify-end">
+                        <button
+                          onClick={() => setActiveRideId(r._id)}
+                          className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                        >
+                          View details
+                        </button>
+                      </div>
+                    </div>
+
+                    {imgs.start.length || imgs.end.length ? (
+                      <div className="mt-3 space-y-2">
+                        {([['Start', imgs.start], ['End', imgs.end]] as const).map(([label, urls]) => urls.length ? (
+                          <div key={label} className="flex flex-wrap items-center gap-2">
+                            <span className="w-10 text-[10px] font-bold text-slate-500">{label}</span>
+                            {urls.map((u, idx) => (
+                              <a key={u + idx} href={u} target="_blank" rel="noreferrer">
+                                <img src={u} alt={`${label}-${idx}`} className="h-10 w-14 rounded-lg border border-slate-200 object-cover" loading="lazy" />
+                              </a>
+                            ))}
+                          </div>
+                        ) : null)}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         {meta ? (

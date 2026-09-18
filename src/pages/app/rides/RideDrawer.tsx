@@ -1057,7 +1057,7 @@ export default function RideDrawer({
         - Desktop (>=md): side-by-side -> map takes remaining space (left), drawer fixed width (right)
         Map now renders on ALL breakpoints (Android, iPhone, tablet, PC) — no more `hidden md:block`.
       */}
-      <div className="absolute inset-0 flex flex-col lg:flex-row">
+      <div className="absolute inset-0 flex h-[100dvh] w-screen min-w-0 flex-col overflow-hidden lg:flex-row">
         {/* MAP: 40% width on left, visible ONLY on laptop/desktop (lg:), hidden on mobile */}
         <div className="hidden lg:flex lg:w-[40%] relative h-full flex-col bg-slate-100 border-r border-slate-200 overflow-hidden shrink-0">
           {isOngoing || pickupOk || dropOk ? (
@@ -1084,7 +1084,7 @@ export default function RideDrawer({
         </div>
 
         {/* DRAWER / DETAILS: 60% on laptop/desktop (lg:), 100% full-width on mobile */}
-        <div className="flex min-h-0 w-full flex-1 flex-col bg-white shadow-xl lg:w-[60%] lg:flex-none">
+        <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-white shadow-xl lg:w-[60%] lg:flex-none">
           {/* Header */}
           <div className="h-16 shrink-0 border-b border-slate-200 px-5 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -1120,7 +1120,7 @@ export default function RideDrawer({
           ) : !ride ? (
             <div className="p-5 text-sm text-slate-600">No data</div>
           ) : (
-            <div className="min-h-0 flex-1 overflow-auto p-5 space-y-5">
+            <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto p-4 sm:p-5">
               {/* 🚨 EMERGENCY BLOCK */}
               {showEmergencyBanner ? (
                 <div className="rounded-2xl border border-red-300 bg-red-50 p-4">
@@ -1277,7 +1277,7 @@ export default function RideDrawer({
                     Change Lat Long
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field
                     label="Pickup (lat, lng)"
                     value={
@@ -1306,7 +1306,7 @@ export default function RideDrawer({
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-sm font-extrabold text-slate-900">Distances</div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Pickup → Drop" value={fmtKm(pickupToDropKm)} />
                   <Field label="Driver → Pickup (Live)" value={fmtKm(driverToPickupKm)} />
                   <Field label="Driver → Drop (Live)" value={fmtKm(driverToDropKm)} />
@@ -1345,7 +1345,7 @@ export default function RideDrawer({
                   Ride Info
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Scheduled Time" value={fmtDate(r.scheduled_time)} />
                   <Field label="Driver Arrival Time" value={fmtDate(r.driver_arrival_time)} />
                 </div>
@@ -1359,14 +1359,14 @@ export default function RideDrawer({
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-sm font-extrabold text-slate-900">Booking Meta</div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Business Function" value={businessFunction || "—"} />
                   <Field label="Trip Category" value={tripCategory || "—"} />
                   <Field label="Business Category" value={businessCategory || "—"} />
                   <Field label="Scheduled Time" value={fmtDate(r.scheduled_time)} />
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Pickup POC Name" value={pickupPOC?.name || "—"} />
                   <Field label="Pickup POC Phone" value={pickupPOC?.phone || "—"} />
                   <Field label="Drop POC Name" value={dropPOC?.name || "—"} />
@@ -1391,7 +1391,7 @@ export default function RideDrawer({
                   </button>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Assigned At" value={fmtDate(assignedAt)} />
                   <Field label="Arrived At" value={fmtDate(r.driver_arrival_time)} />
 
@@ -1539,7 +1539,7 @@ export default function RideDrawer({
                           New Pickup Coordinates
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <input
                             type="number"
                             step="any"
@@ -1577,7 +1577,7 @@ export default function RideDrawer({
                           New Drop Coordinates
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <input
                             type="number"
                             step="any"
@@ -1636,7 +1636,7 @@ export default function RideDrawer({
                   Car Details
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Car Number" value={r.car_details?.car_no || "—"} />
                   <Field label="Car Type" value={r.car_details?.car_type || "—"} />
                   <Field label="Car Model" value={r.car_details?.car_model || "—"} />
@@ -1651,7 +1651,7 @@ export default function RideDrawer({
                   Assigned Driver
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Driver Name" value={r.AssignedDriver?.name || "Not assigned"} />
                   <Field label="Driver Number" value={r.AssignedDriver?.number || "—"} />
                   <Field label="Driver ID" value={r.AssignedDriver?.driverId || "—"} />
@@ -1700,7 +1700,7 @@ export default function RideDrawer({
                   </button>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Base Fare" value={money(r.base_fare)} />
                   <Field label="Fare Estimation" value={money(r.fare_estimation)} />
                   <Field label="Total Fare" value={money(r.total_fare)} />
@@ -1716,7 +1716,7 @@ export default function RideDrawer({
                 {/* ✅ TA + Extra Charges (saved values) */}
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                   <div className="text-xs font-semibold text-slate-600">Post-ride adjustments</div>
-                  <div className="mt-2 grid grid-cols-2 gap-3">
+                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="TA Fare" value={money(r.TAFare)} />
                     <Field label="TA Description" value={r.TADescription || "—"} />
                     <Field label="Driver TA (wallet credit)" value={money(r.driverTA)} />
@@ -1774,7 +1774,7 @@ export default function RideDrawer({
                   Timeline
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Created At" value={fmtDate(r.createdAt)} />
                   <Field label="Updated At" value={fmtDate(r.updatedAt)} />
                   <Field label="Start Ride Time" value={fmtDate(r.start_ride_time)} />
@@ -1802,7 +1802,7 @@ export default function RideDrawer({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Rating" value={`${r.ops_review.rating}/5`} />
                     <Field label="Reviewed At" value={fmtDate(r.ops_review.created_at)} />
                   </div>
@@ -1996,7 +1996,7 @@ export default function RideDrawer({
 
                   {/* ✅ quick post-ride actions */}
                   {isCompleted ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <button
                         disabled={busy}
                         onClick={openTAModal}

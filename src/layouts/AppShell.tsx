@@ -6,8 +6,8 @@ import { useMemo, useState } from "react";
 
 const linkBase =
   "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors";
-const linkInactive = "text-slate-300 hover:bg-slate-800 hover:text-white";
-const linkActive = "bg-emerald-500 text-white shadow-lg shadow-emerald-950/20";
+const linkInactive = "text-gray-700 hover:bg-gray-100 hover:text-black";
+const linkActive = "bg-black text-white shadow-lg shadow-black/20";
 
 export default function AppShell() {
   const user = authStore((s) => s.user);
@@ -58,7 +58,7 @@ export default function AppShell() {
 
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-slate-950 p-4 text-white transition-transform duration-300 md:static md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-gray-200 bg-white p-4 text-black transition-transform duration-300 md:static md:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           }`}
         >
@@ -66,12 +66,12 @@ export default function AppShell() {
             {/* Brand */}
             <div className="flex items-start justify-between px-2 py-2">
               <div>
-                <div className="text-2xl font-black tracking-tight text-emerald-400">OTODDY</div>
-                <div className="mt-0.5 text-xs font-medium text-slate-400">Operations control</div>
+                <div className="text-2xl font-black tracking-tight text-black">OTODDY</div>
+                <div className="mt-0.5 text-xs font-medium text-gray-400">Operations control</div>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white md:hidden"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-black md:hidden"
                 aria-label="Close navigation"
               >
                 <X size={19} />
@@ -79,20 +79,20 @@ export default function AppShell() {
             </div>
 
             {/* User Card */}
-            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-black text-black">
                   {(user?.name || user?.email || "U").slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Signed in as</div>
-                  <div className="mt-0.5 truncate text-sm font-semibold text-white">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500">Signed in as</div>
+                  <div className="mt-0.5 truncate text-sm font-semibold text-black">
                 {user?.name || user?.email || user?.phoneNumber || "User"}
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 text-xs font-semibold capitalize text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <div className="mt-3 flex items-center gap-2 text-xs font-semibold capitalize text-gray-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-black" />
                 {user?.role}
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function AppShell() {
             {/* Logout */}
             <button
               onClick={doLogout}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:border-black hover:bg-black hover:text-white"
             >
               <LogOut size={16} />
               Logout
@@ -142,7 +142,7 @@ export default function AppShell() {
             <div className="flex items-center gap-4">
               <button className="relative rounded-xl p-2 text-slate-500 hover:bg-slate-100" aria-label="Notifications">
                 <Bell size={18} />
-                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-black" />
               </button>
               <span className="text-xs font-semibold capitalize text-slate-500">{user?.role}</span>
             </div>
@@ -156,7 +156,7 @@ export default function AppShell() {
         {/* Mobile Backdrop */}
         {open && (
           <button
-            className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
             onClick={() => setOpen(false)}
           />
         )}
