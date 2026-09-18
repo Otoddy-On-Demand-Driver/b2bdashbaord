@@ -11,6 +11,7 @@ import {
   BadgeIndianRupee, // ✅ add
 
   FileText,    // ✅ Invoices
+  Wrench,
 } from "lucide-react";
 
 import type { Role } from "../store/authStore";
@@ -65,6 +66,14 @@ export const NAV_ITEMS: NavItem[] = [
     to: "/drivers",
     icon: Users,
     roles: ["admin", "opsteam"],
+  },
+
+  {
+    key: "scripts",
+    label: "Scripts",
+    to: "/scripts",
+    icon: Wrench,
+    roles: ["admin"],
   },
 
   // ================= MAP =================

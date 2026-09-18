@@ -1,18 +1,19 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { authStore } from "../store/authStore";
 import { NAV_ITEMS } from "../lib/nav";
-import { LogOut, Menu } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const linkBase =
-  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition";
-const linkInactive = "text-slate-700 hover:bg-slate-100";
-const linkActive = "bg-slate-900 text-white";
+  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors";
+const linkInactive = "text-slate-300 hover:bg-slate-800 hover:text-white";
+const linkActive = "bg-emerald-500 text-white shadow-lg shadow-emerald-950/20";
 
 export default function AppShell() {
   const user = authStore((s) => s.user);
   const logout = authStore((s) => s.logout);
   const nav = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   const items = useMemo(() => {
@@ -21,28 +22,35 @@ export default function AppShell() {
     return NAV_ITEMS.filter((i) => i.roles.includes(role));
   }, [user?.role]);
 
+  const currentItem = useMemo(
+    () => items.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)),
+    [items, location.pathname]
+  );
+
   function doLogout() {
     logout();
     nav("/login", { replace: true });
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex">
+    <div className="min-h-screen bg-slate-100 text-slate-950">
+      <div className="flex min-h-screen">
         {/* Mobile Top Bar */}
-        <header className="md:hidden fixed top-0 left-0 right-0 z-20 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
+        <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden">
           <button
             onClick={() => setOpen((s) => !s)}
-            className="rounded-xl p-2 hover:bg-slate-100"
+            className="rounded-xl p-2 text-slate-600 hover:bg-slate-100"
+            aria-label="Open navigation"
           >
-            <Menu size={20} />
+            <Menu size={21} />
           </button>
 
-          <div className="text-sm font-extrabold tracking-tight">OTOddy Ops</div>
+          <div className="text-sm font-black tracking-tight text-slate-950">OTODDY <span className="font-medium text-slate-400">/ Ops</span></div>
 
           <button
             onClick={doLogout}
-            className="rounded-xl p-2 hover:bg-slate-100"
+            className="rounded-xl p-2 text-slate-600 hover:bg-slate-100"
+            aria-label="Log out"
           >
             <LogOut size={18} />
           </button>
@@ -50,32 +58,47 @@ export default function AppShell() {
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:static z-30 top-0 left-0 h-full w-72 bg-white border-r border-slate-200 transform transition ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-slate-950 p-4 text-white transition-transform duration-300 md:static md:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           }`}
         >
-          <div className="p-5 flex flex-col h-full">
+          <div className="flex min-h-full flex-col">
             {/* Brand */}
-            <div>
-              <div className="text-lg font-extrabold tracking-tight text-slate-900">
-                OTOddy
+            <div className="flex items-start justify-between px-2 py-2">
+              <div>
+                <div className="text-2xl font-black tracking-tight text-emerald-400">OTODDY</div>
+                <div className="mt-0.5 text-xs font-medium text-slate-400">Operations control</div>
               </div>
-              <div className="text-xs text-slate-500">Operations Dashboard</div>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white md:hidden"
+                aria-label="Close navigation"
+              >
+                <X size={19} />
+              </button>
             </div>
 
             {/* User Card */}
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] text-slate-500">Signed in as</div>
-              <div className="mt-1 text-sm font-semibold text-slate-900 truncate">
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950">
+                  {(user?.name || user?.email || "U").slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Signed in as</div>
+                  <div className="mt-0.5 truncate text-sm font-semibold text-white">
                 {user?.name || user?.email || user?.phoneNumber || "User"}
+                  </div>
+                </div>
               </div>
-              <div className="mt-2 inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white capitalize">
+              <div className="mt-3 flex items-center gap-2 text-xs font-semibold capitalize text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 {user?.role}
               </div>
             </div>
 
             {/* Navigation */}
-            <nav className="mt-6 space-y-1 flex-1">
+            <nav className="mt-7 flex-1 space-y-1 overflow-y-auto pr-1">
               {items.map((it) => {
                 const Icon = it.icon;
                 return (
@@ -89,7 +112,8 @@ export default function AppShell() {
                     onClick={() => setOpen(false)}
                   >
                     <Icon size={18} />
-                    {it.label}
+                    <span className="flex-1">{it.label}</span>
+                    <ChevronRight size={15} className={`opacity-0 transition-opacity group-hover:opacity-60 ${location.pathname === it.to ? "opacity-80" : ""}`} />
                   </NavLink>
                 );
               })}
@@ -98,7 +122,7 @@ export default function AppShell() {
             {/* Logout */}
             <button
               onClick={doLogout}
-              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200"
             >
               <LogOut size={16} />
               Logout
@@ -107,16 +131,24 @@ export default function AppShell() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="min-w-0 flex-1">
           {/* Desktop Header */}
-          <div className="hidden md:flex h-16 bg-white border-b border-slate-200 items-center px-5">
-            <div className="text-sm text-slate-700">
-              OTOddy Ops •{" "}
-              <span className="font-semibold capitalize">{user?.role}</span>
+          <div className="hidden h-16 items-center justify-between border-b border-slate-200 bg-white px-6 md:flex lg:px-8">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span className="font-semibold text-slate-900">{currentItem?.label || "Overview"}</span>
+              <ChevronRight size={15} />
+              <span>Operations</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="relative rounded-xl p-2 text-slate-500 hover:bg-slate-100" aria-label="Notifications">
+                <Bell size={18} />
+                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </button>
+              <span className="text-xs font-semibold capitalize text-slate-500">{user?.role}</span>
             </div>
           </div>
 
-          <div className="pt-14 md:pt-0">
+          <div className="min-h-screen pt-16 md:pt-0">
             <Outlet />
           </div>
         </main>
@@ -124,7 +156,7 @@ export default function AppShell() {
         {/* Mobile Backdrop */}
         {open && (
           <button
-            className="fixed inset-0 z-20 bg-black/30 md:hidden"
+            className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-sm md:hidden"
             onClick={() => setOpen(false)}
           />
         )}

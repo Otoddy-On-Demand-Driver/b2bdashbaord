@@ -35,6 +35,7 @@ import {
   opsDeleteRideImage,
   opsUpdateRideFields, // ✅ add
   opsUpdateRideTA,
+  opsUpdateRideDriverTA,
   opsUpdateRideStatus,
   opsChangePickupOrDropLatLong, // ✅ add
   type Driver,
@@ -282,6 +283,7 @@ export default function RideDrawer({
   const [taOpen, setTaOpen] = useState(false);
   const [taFare, setTaFare] = useState("");
   const [taDesc, setTaDesc] = useState("");
+  const [driverTA, setDriverTA] = useState("");
 
   // ✅ Extra Charges modal
   const [extraOpen, setExtraOpen] = useState(false);
@@ -824,6 +826,7 @@ export default function RideDrawer({
     setErr("");
     setTaFare(String(rr?.TAFare ?? rr?.taFare ?? ""));
     setTaDesc(String(rr?.TADescription ?? rr?.taDescription ?? ""));
+    setDriverTA(String(rr?.driverTA ?? ""));
     setTaOpen(true);
   }
 
@@ -837,6 +840,10 @@ export default function RideDrawer({
         TADescription: String(taDesc || ""),
       };
       await opsUpdateRideTA(rideId, payload);
+      const nextDriverTA = Number(driverTA || 0);
+      if (Number.isFinite(nextDriverTA)) {
+        await opsUpdateRideDriverTA(rideId, nextDriverTA);
+      }
       setTaOpen(false);
       await load();
       onMutated();
@@ -1096,7 +1103,7 @@ export default function RideDrawer({
                   View Live Map
                 </button>
               ) : null}
-              <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
+              <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close ride details">
                 <X />
               </button>
             </div>
@@ -1116,7 +1123,7 @@ export default function RideDrawer({
             <div className="min-h-0 flex-1 overflow-auto p-5 space-y-5">
               {/* 🚨 EMERGENCY BLOCK */}
               {showEmergencyBanner ? (
-                <div className="rounded-3xl border border-red-300 bg-red-50 p-4">
+                <div className="rounded-2xl border border-red-300 bg-red-50 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-red-700">
                       <AlertTriangle size={20} />
@@ -1158,7 +1165,7 @@ export default function RideDrawer({
               ) : null}
 
               {/* Route + status */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 {/* Header: Status + Fare */}
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1699,12 +1706,8 @@ export default function RideDrawer({
                   <Field label="Total Fare" value={money(r.total_fare)} />
                   <Field label="Incentive" value={money(r.insentive_amount)} />
 
-                  {isAdmin && (
-                    <>
-                      <Field label="Extended Time Fare (estimate)" value={money(r.extended_time_fare)} />
-                      <Field label="Extended Time Duration (estimate)" value={num(r.extended_time_duration)} />
-                    </>
-                  )}
+                  <Field label="Extended Time Fare (estimate)" value={money(r.extended_time_fare)} />
+                  <Field label="Extended Time Duration (estimate)" value={num(r.extended_time_duration)} />
 
                   <Field label="Time Estimations (mins?)" value={num(r.time_estimations)} />
                   <Field label="Distance Estimation" value={num(r.distance_estimation)} />
@@ -1716,23 +1719,19 @@ export default function RideDrawer({
                   <div className="mt-2 grid grid-cols-2 gap-3">
                     <Field label="TA Fare" value={money(r.TAFare)} />
                     <Field label="TA Description" value={r.TADescription || "—"} />
+                    <Field label="Driver TA (wallet credit)" value={money(r.driverTA)} />
 
-                    {isAdmin && (
-                      <>
-                        <Field label="Actual Extended Time (mins)" value={num(r.actual_extended_time_duration)} />
-                        <Field label="Actual Extended Time Fare" value={money(r.actual_extended_time_fare)} />
-
-                        <Field label="Waiting Duration (mins)" value={num(r.waiting_duration)} />
-                        <Field label="Waiting Charge" value={money(r.waiting_charge)} />
-                      </>
-                    )}
+                    <Field label="Actual Extended Time (mins)" value={num(r.actual_extended_time_duration)} />
+                    <Field label="Actual Extended Time Fare" value={money(r.actual_extended_time_fare)} />
+                    <Field label="Waiting Duration (mins)" value={num(r.waiting_duration)} />
+                    <Field label="Waiting Charge" value={money(r.waiting_charge)} />
 
                     <Field label="Extra Distance Fare" value={money(r.extended_actual_distance_fare)} />
                     <Field
                       label="Extra Total (sum)"
                       value={money(
-                        (isAdmin ? Number(r.actual_extended_time_fare || 0) : 0) +
-                        (isAdmin ? Number(r.waiting_charge || 0) : 0) +
+                        Number(r.actual_extended_time_fare || 0) +
+                        Number(r.waiting_charge || 0) +
                         Number(r.extended_actual_distance_fare || 0) +
                         Number(r.TAFare || 0)
                       )}
@@ -2321,6 +2320,25 @@ export default function RideDrawer({
                     </div>
 
                     <div className="mt-4 space-y-3">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        Driver TA (₹, positive credits / negative debits)
+                        <input
+                          value={driverTA}
+                          onChange={(e) => setDriverTA(e.target.value.replace(/[^\d-]/g, ""))}
+                          placeholder="0"
+                          className="mt-2 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm"
+                        />
+                        <div className={`mt-2 rounded-xl px-3 py-2 text-xs font-semibold ${Number(driverTA || 0) < 0 ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                          {(() => {
+                            const previous = Number(ride?.driverTA || 0);
+                            const next = Number(driverTA || 0);
+                            const adjustment = next - previous;
+                            if (adjustment === 0) return "No wallet change";
+                            return `${money(Math.abs(adjustment))} will be ${adjustment > 0 ? "credited to" : "debited from"} the driver's wallet`;
+                          })()}
+                        </div>
+                      </label>
+
                       <label className="block text-xs font-semibold text-slate-600">
                         TA Fare (₹)
                         <input

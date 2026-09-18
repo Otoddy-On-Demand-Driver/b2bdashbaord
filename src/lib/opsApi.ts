@@ -45,6 +45,9 @@ export type Ride = {
   // ✅ TA fields
   TAFare?: number;
   TADescription?: string;
+  driverTA?: number | null;
+  driverPayableTA?: number;
+  driverWalletCreditNote?: string;
 
   // ✅ extra charge fields (update-fields)
   actual_extended_time_duration?: number;
@@ -104,6 +107,11 @@ export async function opsListDrivers() {
 export async function opsGetDriver(driverId: string) {
   const { data } = await api.get(`/ops/drivers/${driverId}`);
   return data as { ok: boolean; driver: Driver };
+}
+
+export async function opsSetDriverWalletBalance(driverId: string, walletBalance: number) {
+  const { data } = await api.patch(`/ops/drivers/${driverId}/wallet-balance`, { walletBalance });
+  return data as { ok: boolean; driver: Pick<Driver, "_id" | "name" | "walletBalance">; message?: string };
 }
 
 export async function opsCompleteDriverVerification(driverId: string) {
@@ -422,4 +430,14 @@ export async function opsChangePickupOrDropLatLong(
   );
 
   return res.data;
+}
+
+export async function opsUpdateRideDriverTA(rideId: string, driverTA: number) {
+  const { data } = await api.patch(`/ops/rides/${rideId}/update-driver-ta`, { driverTA });
+  return data;
+}
+
+export async function opsResetAllDriverWalletBalances() {
+  const { data } = await api.post("/ops/drivers/reset-wallet-balances");
+  return data as { ok: boolean; updated: number; message?: string };
 }

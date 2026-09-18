@@ -23,7 +23,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5">
+    <div className="portal-surface p-5">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-extrabold text-slate-900">{title}</div>
@@ -99,10 +99,11 @@ export default function SettingsPage() {
     user?.isApproved === true ? "green" : user?.isApproved === false ? "amber" : "slate";
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Workspace preferences</div>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
           Settings
         </h1>
         <p className="mt-1 text-sm text-slate-600">
@@ -118,7 +119,7 @@ export default function SettingsPage() {
             <Field label="Email" value={user?.email as any} />
             <Field label="Phone" value={user?.phoneNumber as any} />
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
                 Role
               </div>
               <div className="mt-1 flex items-center gap-2">

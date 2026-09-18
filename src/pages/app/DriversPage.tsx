@@ -52,11 +52,11 @@ function StatCard({
   subtitle: string;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="portal-surface min-h-[132px] p-5 transition-shadow hover:shadow-md">
+      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
         {title}
       </div>
-      <div className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
+      <div className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </div>
       <div className="mt-2 text-sm text-slate-600">{subtitle}</div>
@@ -291,9 +291,9 @@ export default function DriversPage() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen bg-slate-50/70 p-4 md:p-6">
-      <div className="mx-auto max-w-[1500px]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="space-y-6">
+        <div className="portal-surface p-5 md:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -344,7 +344,7 @@ export default function DriversPage() {
             />
           </div>
 
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50/80 p-3 md:p-4">
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 md:p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap gap-2">
                 <button
@@ -415,7 +415,7 @@ export default function DriversPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="hidden grid-cols-14 gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-bold uppercase tracking-wide text-slate-500 lg:grid">
               <div className="col-span-4">Driver</div>
               <div className="col-span-2">Online</div>

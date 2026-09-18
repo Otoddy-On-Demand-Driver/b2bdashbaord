@@ -290,39 +290,41 @@ export default function DashboardHome() {
   }, [b2b, isAdmin]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{greet.title}</h1>
-          <p className="mt-1 text-sm text-slate-600">{greet.sub}</p>
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Operations overview</div>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">{greet.title}</h1>
+          <p className="mt-1 text-sm text-slate-500">{greet.sub}</p>
         </div>
 
         <button
           onClick={loadAll}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50"
         >
           Refresh
         </button>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between gap-4">
+      <div className="portal-surface flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+        <div>
           <div>
-            <div className="text-sm text-slate-500">Logged in as</div>
-            <div className="mt-1 text-lg font-semibold text-slate-900 capitalize">{user?.role || "—"}</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Workspace status</div>
+            <div className="mt-1 text-lg font-black text-slate-950 capitalize">{user?.role || "—"}</div>
             {user?.email ? <div className="mt-1 text-xs text-slate-500">{user.email}</div> : null}
           </div>
-
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-            {loading ? "Loading…" : "Live"}
-          </span>
         </div>
+
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {loading ? "Loading…" : "Live"}
+        </span>
       </div>
 
       {err ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div> : null}
 
       {loading || !stats ? (
-        <div className="text-sm text-slate-500">Loading stats…</div>
+        <div className="portal-surface p-5 text-sm text-slate-500">Loading stats…</div>
       ) : (
         <>
           {/* Cards */}
@@ -370,8 +372,8 @@ export default function DashboardHome() {
 
               <Panel title="Quick Actions">
                 <Link
-                  to="/rides"
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  to="/b2b/rides"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50"
                 >
                   Open Rides
                 </Link>
@@ -423,18 +425,18 @@ export default function DashboardHome() {
 
 function StatCard({ title, value, meta }: { title: string; value: string | number; meta?: string }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5">
-      <div className="text-sm text-slate-500">{title}</div>
-      <div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div>
-      {meta ? <div className="mt-1 text-xs text-slate-500">{meta}</div> : null}
+    <div className="portal-surface min-h-[132px] p-5 transition-shadow hover:shadow-md">
+      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</div>
+      <div className="mt-3 text-3xl font-black tracking-tight text-slate-950">{value}</div>
+      {meta ? <div className="mt-2 text-xs font-medium text-slate-500">{meta}</div> : null}
     </div>
   );
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5">
-      <div className="text-sm font-semibold text-slate-900">{title}</div>
+    <div className="portal-surface p-5">
+      <div className="border-b border-slate-100 pb-3 text-sm font-black text-slate-950">{title}</div>
       <div className="mt-3 space-y-3 text-sm text-slate-700">{children}</div>
     </div>
   );

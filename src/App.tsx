@@ -26,6 +26,7 @@ import B2BRidesPage from "./pages/b2b/B2BRidesPage";
 import InvoicesPage from "./pages/invoices/InvoicesPage";
 import InvoiceView from "./pages/invoices/InvoiceView";
 import CreditNotes from "./pages/CreditNotes";
+import ScriptsPage from "./pages/app/admin/ScriptsPage";
 export default function App() {
   const hydrate = authStore((s) => s.hydrate);
 
@@ -77,6 +78,7 @@ export default function App() {
 
             <Route element={<RoleGate allow={["admin"]} />}>
               <Route path="ops/rides/ta-export" element={<TAExportPage />} />
+              <Route path="scripts" element={<ScriptsPage />} />
             </Route>
 
             {/* Role-based: admin only */}

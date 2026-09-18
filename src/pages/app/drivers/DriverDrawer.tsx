@@ -8,6 +8,7 @@ import {
   opsCompleteDriverVerification, // approve (sets isApproved=true)
   opsRejectDriverVerification,   // ✅ add this in opsApi.ts (POST /ops/drivers/:driverId/reject)
   opsGetDriver,
+  opsSetDriverWalletBalance,
   opsChangeDriverStatus,
   type Driver,
 } from "../../../lib/opsApi";
@@ -32,6 +33,7 @@ export default function DriverDrawer({
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [walletBalanceInput, setWalletBalanceInput] = useState("");
 
   // ✅ reject modal
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -51,6 +53,7 @@ export default function DriverDrawer({
     try {
       const r = await opsGetDriver(driverId);
       setDriver(r.driver);
+      setWalletBalanceInput(String(r.driver.walletBalance ?? 0));
     } catch (e: any) {
       setErr(apiErrorMessage(e, "Failed to load driver"));
     } finally {
@@ -116,6 +119,28 @@ export default function DriverDrawer({
     }
   }
 
+  async function updateWalletBalance() {
+    if (!driverId) return;
+
+    const nextBalance = Number(walletBalanceInput);
+    if (!Number.isFinite(nextBalance) || nextBalance < 0) {
+      setErr("Enter a valid wallet balance of 0 or more.");
+      return;
+    }
+
+    setErr("");
+    setBusy(true);
+    try {
+      await opsSetDriverWalletBalance(driverId, nextBalance);
+      await load();
+      onMutated();
+    } catch (e: any) {
+      setErr(apiErrorMessage(e, "Wallet balance update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!open) return null;
 
   const d: any = driver || {};
@@ -126,11 +151,11 @@ export default function DriverDrawer({
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="Close" />
 
-      <div className="absolute right-0 top-0 h-full w-full bg-white shadow-xl sm:w-[520px]">
+      <div className="absolute right-0 top-0 h-full w-full bg-slate-50 shadow-xl sm:w-[520px]">
         {/* Header */}
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
+        <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-5">
           <div className="min-w-0">
-            <div className="text-sm font-extrabold text-slate-900">Driver Profile</div>
+            <div className="text-sm font-black text-slate-950">Driver Profile</div>
             <div className="text-xs text-slate-500 truncate max-w-[360px]">{driverId}</div>
           </div>
           <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close">
@@ -150,9 +175,9 @@ export default function DriverDrawer({
         ) : !driver ? (
           <div className="p-5 text-sm text-slate-600">No data</div>
         ) : (
-          <div className="space-y-4 p-5 overflow-y-auto h-[calc(100%-64px)]">
+          <div className="h-[calc(100%-64px)] space-y-4 overflow-y-auto p-5">
             {/* Top card */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-base font-extrabold text-slate-900 truncate">{d.name || "—"}</div>
@@ -186,18 +211,20 @@ export default function DriverDrawer({
             </div>
 
             {/* Primary actions */}
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              {(isAdmin || user?.role === "opsteam") && (
+                <button
+                  disabled={busy || isApproved}
+                  onClick={approve}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  <BadgeCheck size={18} />
+                  {isApproved ? "Already Approved" : "Approve Driver (Complete Verification)"}
+                </button>
+              )}
+
               {isAdmin && (
                 <>
-                  <button
-                    disabled={busy || isApproved}
-                    onClick={approve}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    <BadgeCheck size={18} />
-                    {isApproved ? "Already Approved" : "Approve Driver (Complete Verification)"}
-                  </button>
-
                   <button
                     disabled={busy || isApproved}
                     onClick={() => setRejectOpen(true)}
@@ -220,11 +247,7 @@ export default function DriverDrawer({
                 {d.currentStatus === "online" ? "Set Offline" : "Set Online"}
               </button>
 
-              <div className="text-xs text-slate-500">
-                Approve: <span className="font-semibold">POST /ops/drivers/:driverId/approve</span> • Reject:{" "}
-                <span className="font-semibold">POST /ops/drivers/:driverId/reject</span> • Status:{" "}
-                <span className="font-semibold">PATCH /ops/drivers/:driverId/status</span>
-              </div>
+              <div className="text-xs text-slate-500">Changes are saved immediately and reflected across the operations dashboard.</div>
             </div>
 
             {/* Details sections */}
@@ -246,6 +269,32 @@ export default function DriverDrawer({
                 <KeyValue label="Wallet Balance" value={money(d.walletBalance)} />
                 <KeyValue label="Rating" value={ratingText(d)} />
               </Section>
+
+              {isAdmin && (
+                <Section title="Wallet">
+                  <div className="text-xs text-slate-500">
+                    Current balance: <span className="font-extrabold text-slate-900">{money(d.walletBalance)}</span>
+                  </div>
+                  <label className="mt-3 block text-xs font-semibold text-slate-600">
+                    Set wallet balance (₹)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={walletBalanceInput}
+                      onChange={(e) => setWalletBalanceInput(e.target.value)}
+                      className="mt-2 h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm"
+                    />
+                  </label>
+                  <button
+                    disabled={busy}
+                    onClick={updateWalletBalance}
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {busy ? "Updating..." : "Update Wallet Balance"}
+                  </button>
+                </Section>
+              )}
 
               <Section title="Bank">
                 <KeyValue label="Bank Name" value={nice(d.bankDetails?.bankName)} />

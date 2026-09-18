@@ -52,13 +52,14 @@ export default function PaymentsPage() {
     [withdrawals]
   );
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading payments…</div>;
+  if (loading) return <div className="p-4 text-sm text-slate-500 sm:p-6 lg:p-8">Loading payments…</div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Payments</h1>
-        <p className="mt-1 text-sm text-slate-600">Driver earnings & withdrawal requests</p>
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Financial operations</div>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Payments</h1>
+        <p className="mt-1 text-sm text-slate-500">Driver earnings and withdrawal requests.</p>
       </div>
 
       {err && (
@@ -69,30 +70,31 @@ export default function PaymentsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <div className="text-sm text-slate-500">Today’s Earnings</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">
+        <div className="portal-surface min-h-[132px] p-5">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Today’s Earnings</div>
+          <div className="mt-3 text-3xl font-black text-slate-950">
             ₹{(totalEarnings ?? 0).toLocaleString("en-IN")}
           </div>
           <div className="mt-1 text-xs text-slate-500">From {ridesCount ?? 0} completed rides</div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <div className="text-sm text-slate-500">Withdrawal Requests</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{withdrawals.length}</div>
+        <div className="portal-surface min-h-[132px] p-5">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Withdrawal Requests</div>
+          <div className="mt-3 text-3xl font-black text-slate-950">{withdrawals.length}</div>
           <div className="mt-1 text-xs text-slate-500">Total requests received</div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <div className="text-sm text-slate-500">Pending</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{pendingCount}</div>
+        <div className="portal-surface min-h-[132px] p-5">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Pending</div>
+          <div className="mt-3 text-3xl font-black text-slate-950">{pendingCount}</div>
           <div className="mt-1 text-xs text-slate-500">Need ops/admin action</div>
         </div>
       </div>
 
       {/* Withdrawals Table */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-        <div className="grid grid-cols-12 gap-3 border-b border-slate-200 px-5 py-3 text-xs font-semibold text-slate-500">
+      <div className="portal-surface overflow-x-auto">
+        <div className="min-w-[720px]">
+        <div className="grid grid-cols-12 gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
           <div className="col-span-4">Driver</div>
           <div className="col-span-2">Amount</div>
           <div className="col-span-2">Status</div>
@@ -131,6 +133,7 @@ export default function PaymentsPage() {
             </button>
           ))
         )}
+        </div>
       </div>
 
       {/* Drawer */}
